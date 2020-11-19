@@ -1,0 +1,13 @@
+docs/
+tmp/
+\.bundle$
+\.lock$
+\.gemspec$
+\.so$
+spec/\.status
+coverage/
+vendor/
+pkg/
+^Session.vim$
+^Makefile$
+
