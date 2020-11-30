@@ -1,0 +1,298 @@
+# vim: set nosta et ts=4 sw=4:
+#
+# Rubocop is known to have breaking changes.
+# Disable everything by default, enable only the rulesets
+# we're interested in.
+#
+---
+AllCops:
+    StyleGuideBaseURL: https://app.laika.com/intranet/it/RubyStyleGuide
+    DisabledByDefault: true
+    UseCache: true
+    MaxFilesInCache: 250
+    AllowSymlinksInCacheRootDirectory: true
+    NewCops: enable
+    Exclude:
+        - gem.deps.rb
+        - "*.gemspec"
+
+# https://docs.rubocop.org/rubocop/0.93/cops_layout.html
+# Matching the LAIKA style guide as much as possible.
+#
+Layout/AccessModifierIndentation:
+    Enabled: true
+    EnforcedStyle: indent
+Layout/ArgumentAlignment:
+    Enabled: true
+    EnforcedStyle: with_fixed_indentation
+Layout/ArrayAlignment:
+    Enabled: true
+    EnforcedStyle: with_first_element
+Layout/AssignmentIndentation:
+    Enabled: true
+Layout/BeginEndAlignment:
+    Enabled: true
+    EnforcedStyleAlignWith: start_of_line
+Layout/BlockAlignment:
+    Enabled: true
+    EnforcedStyleAlignWith: either
+Layout/BlockEndNewline:
+    Enabled: true
+Layout/ClassStructure:
+    ExpectedOrder:
+        - module_inclusion
+        - constants
+        - association
+        - macros
+        - public_class_methods
+        - initializer
+        - public_attribute_macros
+        - public_delegate
+        - public_methods
+        - protected_attribute_macros
+        - protected_methods
+        - private_attribute_macros
+        - private_delegate
+        - private_methods
+Layout/ClosingParenthesisIndentation:
+    Enabled: true
+Layout/CommentIndentation:
+    Enabled: true
+Layout/ConditionPosition:
+    Enabled: true
+Layout/DotPosition:
+    Enabled: true
+    EnforcedStyle: trailing
+Layout/ElseAlignment:
+    Enabled: false
+Layout/EmptyComment:
+    Enabled: true
+    AllowBorderComment: true
+    AllowMarginComment: true
+Layout/EmptyLines:
+    Enabled: false
+Layout/EmptyLineAfterMagicComment:
+    Enabled: true
+Layout/EmptyLineBetweenDefs:
+    Enabled: true
+    AllowAdjacentOneLineDefs: true
+    NumberOfEmptyLines: 2
+Layout/EmptyLinesAroundArguments:
+    Enabled: true
+Layout/EmptyLinesAroundAttributeAccessor:
+    Enabled: true
+    AllowAliasSyntax: true
+Layout/EndOfLine:
+    Enabled: true
+    EnforcedStyle: lf
+Layout/ExtraSpacing:
+    Enabled: true
+    AllowForAlignment: true
+    AllowBeforeTrailingComments: true
+Layout/HashAlignment:
+    Enabled: false # not configurable enough
+    EnforcedHashRocketStyle: table
+    EnforcedColonStyle: table
+Layout/HeredocIndentation:
+    Enabled: true
+Layout/IndentationConsistency:
+    Enabled: true
+Layout/IndentationStyle:
+    Enabled: true
+    EnforcedStyle: tabs
+Layout/IndentationWidth:
+    Enabled: true
+    Width: 1
+Layout/InitialIndentation:
+    Enabled: true
+Layout/LeadingCommentSpace:
+    Enabled: true
+Layout/LineLength:
+    Max: 100
+Layout/MultilineArrayBraceLayout:
+    Enabled: true
+    EnforcedStyle: symmetrical
+Layout/MultilineArrayLineBreaks:
+    Enabled: true
+Layout/MultilineAssignmentLayout:
+    Enabled: true
+    EnforcedStyle: same_line
+Layout/MultilineHashBraceLayout:
+    Enabled: true
+    EnforcedStyle: symmetrical
+Layout/MultilineHashKeyLineBreaks:
+    Enabled: true
+Layout/MultilineMethodArgumentLineBreaks:
+    Enabled: false
+Layout/MultilineMethodCallIndentation:
+    Enabled: true
+    EnforcedStyle: indented
+Layout/RescueEnsureAlignment:
+    Enabled: true
+Layout/SpaceAfterColon:
+    Enabled: true
+Layout/SpaceAfterComma:
+    Enabled: true
+Layout/SpaceAfterMethodName:
+    Enabled: true
+Layout/SpaceAfterNot:
+    Enabled: false
+Layout/SpaceAroundBlockParameters:
+    Enabled: true
+    EnforcedStyleInsidePipes: no_space
+Layout/SpaceAroundEqualsInParameterDefault:
+    Enabled: true
+    EnforcedStyle: no_space
+Layout/SpaceAroundKeyword:
+    Enabled: true
+Layout/SpaceAroundMethodCallOperator:
+    Enabled: true
+Layout/SpaceBeforeBlockBraces:
+    Enabled: true
+    EnforcedStyle: no_space
+Layout/SpaceBeforeComma:
+    Enabled: true
+Layout/SpaceBeforeComment:
+    Enabled: true
+Layout/SpaceBeforeFirstArg:
+    Enabled: true
+Layout/SpaceBeforeSemicolon:
+    Enabled: true
+Layout/SpaceInLambdaLiteral:
+    Enabled: true
+    EnforcedStyle: require_no_space
+Layout/SpaceInsideArrayLiteralBrackets:
+    Enabled: false # not configurable enough
+    EnforcedStyle: space
+Layout/SpaceInsideBlockBraces:
+    Enabled: true
+    SpaceBeforeBlockParameters: false
+Layout/SpaceInsideHashLiteralBraces:
+    Enabled: false # not configurable enough
+    EnforcedStyle: space
+Layout/SpaceInsideParens:
+    Enabled: true
+    EnforcedStyle: space
+Layout/SpaceInsideReferenceBrackets:
+    Enabled: true
+    EnforcedStyle: space
+Layout/TrailingEmptyLines:
+    Enabled: true
+    EnforcedStyle: final_blank_line
+Layout/TrailingWhitespace:
+    Enabled: true
+
+# https://docs.rubocop.org/rubocop/0.93/cops_lint.html
+# Enabling everything, these are warnings, and seem generally reasonable.
+#
+Lint:
+    Enabled: true
+
+# https://docs.rubocop.org/rubocop/0.93/cops_naming.html
+#
+Naming/AccessorMethodName:
+    Enabled: true
+Naming/BinaryOperatorParameterName:
+    Enabled: true
+Naming/ClassAndModuleCamelCase:
+    Enabled: true
+Naming/ConstantName:
+    Enabled: true
+Naming/FileName:
+    Enabled: true
+Naming/HeredocDelimiterCase:
+    Enabled: true
+Naming/MemoizedInstanceVariableName:
+    Enabled: true
+    EnforcedStyleForLeadingUnderscores: optional
+Naming/MethodName:
+    Enabled: true
+Naming/PredicateName:
+    Enabled: true
+Naming/VariableName:
+    Enabled: true
+    EnforcedStyle: snake_case
+
+
+# https://docs.rubocop.org/rubocop/0.93/cops_style.html
+#
+Style/Documentation:
+    Enabled: true
+Style/AccessorGrouping:
+    Enabled: true
+    EnforcedStyle: separated
+Style/AndOr:
+    Enabled: true
+Style/Attr:
+    Enabled: true
+Style/AutoResourceCleanup:
+    Enabled: true
+Style/BisectedAttrAccessor:
+    Enabled: true
+Style/BlockDelimiters:
+    Enabled: true
+Style/ClassMethods:
+    Enabled: true
+Style/ClassMethodsDefinitions:
+    Enabled: true
+    EnforcedStyle: def_self
+Style/DocumentationMethod:
+    Enabled: true
+Style/EachForSimpleLoop:
+    Enabled: true
+Style/EmptyBlockParameter:
+    Enabled: true
+Style/For:
+    Enabled: true
+    EnforcedStyle: each
+Style/GlobalVars:
+    Enabled: true
+Style/HashSyntax:
+    Enabled: true
+    EnforcedStyle: no_mixed_keys
+Style/IfWithSemicolon:
+    Enabled: true
+Style/ImplicitRuntimeError:
+    Enabled: true
+Style/MethodCallWithoutArgsParentheses:
+    Enabled: true
+Style/MethodDefParentheses:
+    Enabled: true
+Style/NegatedIf:
+    Enabled: true
+Style/NegatedUnless:
+    Enabled: true
+Style/NestedModifier:
+    Enabled: true
+Style/Next:
+    Enabled: true
+Style/NilComparison:
+    Enabled: true
+Style/NonNilCheck:
+    Enabled: true
+Style/Not:
+    Enabled: true
+Style/OrAssignment:
+    Enabled: true
+Style/RedundantConditional:
+    Enabled: true
+Style/RedundantFileExtensionInRequire:
+    Enabled: true
+Style/ReturnNil:
+    Enabled: true
+Style/TrailingCommaInArguments:
+    Enabled: true
+    EnforcedStyleForMultiline: no_comma
+Style/TrailingCommaInArrayLiteral:
+    Enabled: true
+    EnforcedStyleForMultiline: no_comma
+Style/TrailingCommaInBlockArgs:
+    Enabled: true
+Style/TrailingCommaInHashLiteral:
+    Enabled: true
+    EnforcedStyleForMultiline: no_comma
+Style/TrivialAccessors:
+    Enabled: true
+Style/UnlessElse:
+    Enabled: true
+

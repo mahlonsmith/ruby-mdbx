@@ -8,11 +8,19 @@ if ENV[ 'COVERAGE' ]
 	SimpleCov.start
 end
 
+require 'pathname'
 require 'rspec'
 require 'mdbx'
 
 
+module MDBX::Testing
+	TEST_DATABASE = Pathname( __FILE__ ).parent.parent + 'data' + 'testdb'
+end
+
+
 RSpec.configure do |config|
+	include MDBX::Testing
+
 	config.expect_with :rspec do |expectations|
 		expectations.include_chain_clauses_in_custom_matcher_descriptions = true
 		expectations.syntax = :expect
@@ -32,7 +40,7 @@ RSpec.configure do |config|
 	config.run_all_when_everything_filtered = true
 	# config.warnings = true
 
-	# config.include( Zyre::Testing )
+	config.include( MDBX::Testing )
 	# config.include( Loggability::SpecHelpers )
 end
 

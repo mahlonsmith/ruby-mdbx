@@ -9,7 +9,14 @@
 void
 Init_mdbx_ext()
 {
-	mdbx_mMDBX = rb_define_module( "MDBX" );
-	rb_define_const( mdbx_mMDBX, "LIBRARY_VERSION", rb_str_new_cstr(mdbx_version.git.describe) );
+	rmdbx_mMDBX = rb_define_module( "MDBX" );
+
+	/* The backend library version. */
+	VALUE version = rb_str_new_cstr( mdbx_version.git.describe );
+	rb_define_const( rmdbx_mMDBX, "LIBRARY_VERSION", version );
+
+	rmdbx_eDatabaseError = rb_define_class_under( rmdbx_mMDBX, "DatabaseError", rb_eRuntimeError );
+
+	rmdbx_init_database();
 }
 

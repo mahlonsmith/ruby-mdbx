@@ -10,9 +10,11 @@ require 'mdbx_ext'
 module MDBX
 
 	# The version of this gem.
+	#
 	# Note: the MDBX library version can be found in
 	# the 'LIBRARY_VERSION' constant.
+	#
 	VERSION = '0.0.1'
 
-end
+end # module MDBX
 
