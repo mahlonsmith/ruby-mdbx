@@ -191,14 +191,18 @@ rmdbx_put_val( VALUE self, VALUE key, VALUE val )
 	if ( RTEST(rmdbx_closed_p(self)) ) rb_raise( rmdbx_eDatabaseError, "Closed database." );
 
 	rmdbx_open_txn( self, MDBX_TXN_READWRITE );
-
 	MDBX_val ckey = rmdbx_vec_for( key );
-	MDBX_val data = rmdbx_vec_for( val );
-	rc = mdbx_get( db->txn, db->dbi, &ckey, &data );
 
 	// FIXME: DUPSORT is enabled -- different api?
 	// See:  MDBX_NODUPDATA / MDBX_NOOVERWRITE
-	rc = mdbx_put( db->txn, db->dbi, &ckey, &data, 0 );
+	if ( NIL_P(val) ) { /* remove if set to nil */
+		rc = mdbx_del( db->txn, db->dbi, &ckey, NULL );
+	}
+	else {
+		MDBX_val old;
+		MDBX_val data = rmdbx_vec_for( val );
+		rc = mdbx_replace( db->txn, db->dbi, &ckey, &data, &old, 0 );
+	}
 
 	mdbx_txn_commit( db->txn );
 
@@ -206,7 +210,7 @@ rmdbx_put_val( VALUE self, VALUE key, VALUE val )
 		case MDBX_SUCCESS:
 			return val;
 		default:
-			rb_raise( rmdbx_eDatabaseError, "Unable to fetch value: (%d) %s", rc, mdbx_strerror(rc) );
+			rb_raise( rmdbx_eDatabaseError, "Unable to store value: (%d) %s", rc, mdbx_strerror(rc) );
 	}
 }
 
