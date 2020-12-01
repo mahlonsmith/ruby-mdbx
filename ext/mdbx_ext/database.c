@@ -45,19 +45,36 @@ static const rb_data_type_t rmdbx_db_data = {
 VALUE
 rmdbx_alloc( VALUE klass )
 {
-	int *data = malloc( sizeof(rmdbx_db_t) );
-	return TypedData_Wrap_Struct( klass, &rmdbx_db_data, data );
+	rmdbx_db_t *data;
+	return TypedData_Make_Struct( klass, rmdbx_db_t, &rmdbx_db_data, data );
+}
+
+
+/*
+ * Ensure all database file descriptors are collected and
+ * removed.
+ */
+void
+rmdbx_destroy( rmdbx_db_t* db )
+{
+	if ( db->cursor ) mdbx_cursor_close( db->cursor );
+	if ( db->txn )    mdbx_txn_abort( db->txn );
+	if ( db->dbi )    mdbx_dbi_close( db->env, db->dbi );
+	if ( db->env )    mdbx_env_close( db->env );
+	db->open = 0;
 }
 
 
 /*
  * Cleanup a previously allocated DB environment.
- * FIXME:  ... this should also close if not already closed?
  */
 void
 rmdbx_free( void *db )
 {
-	if ( db ) free( db );
+	if ( db ) {
+		rmdbx_destroy( db );
+		free( db );
+	}
 }
 
 
@@ -68,14 +85,7 @@ VALUE
 rmdbx_close( VALUE self )
 {
 	UNWRAP_DB( self, db );
-	if ( db->cursor ) mdbx_cursor_close( db->cursor );
-	if ( db->txn )    mdbx_txn_abort( db->txn );
-	if ( db->dbi )    mdbx_dbi_close( db->env, db->dbi );
-	if ( db->env )    mdbx_env_close( db->env );
-	db->open = 0;
-
-	// FIXME: or rather, maybe free() from here?
-
+	rmdbx_destroy( db );
 	return Qtrue;
 }
 
