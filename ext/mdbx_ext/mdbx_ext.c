@@ -2,6 +2,8 @@
 
 #include "mdbx_ext.h"
 
+VALUE rmdbx_mMDBX;
+VALUE rmdbx_eDatabaseError;
 
 /*
  * MDBX initialization

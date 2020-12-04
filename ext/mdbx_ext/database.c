@@ -5,6 +5,8 @@
 /* VALUE str = rb_sprintf( "path: %+"PRIsVALUE", opts: %+"PRIsVALUE, path, opts ); */
 /* printf( "%s\n", StringValueCStr(str) ); */
 
+VALUE rmdbx_cDatabase;
+
 
 /* Shortcut for fetching current DB variables.
  *
@@ -45,8 +47,8 @@ static const rb_data_type_t rmdbx_db_data = {
 VALUE
 rmdbx_alloc( VALUE klass )
 {
-	rmdbx_db_t *data;
-	return TypedData_Make_Struct( klass, rmdbx_db_t, &rmdbx_db_data, data );
+	rmdbx_db_t *new = RB_ALLOC( rmdbx_db_t );
+	return TypedData_Make_Struct( klass, rmdbx_db_t, &rmdbx_db_data, new );
 }
 
 
