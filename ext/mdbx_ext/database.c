@@ -26,6 +26,7 @@ struct rmdbx_db {
 	MDBX_cursor *cursor;
 	int env_flags;
 	int open;
+	char *subdb;
 };
 typedef struct rmdbx_db rmdbx_db_t;
 
@@ -57,7 +58,7 @@ rmdbx_alloc( VALUE klass )
  * removed.
  */
 void
-rmdbx_destroy( rmdbx_db_t* db )
+rmdbx_close_all( rmdbx_db_t* db )
 {
 	if ( db->cursor ) mdbx_cursor_close( db->cursor );
 	if ( db->txn )    mdbx_txn_abort( db->txn );
@@ -74,20 +75,20 @@ void
 rmdbx_free( void *db )
 {
 	if ( db ) {
-		rmdbx_destroy( db );
+		rmdbx_close_all( db );
 		free( db );
 	}
 }
 
 
 /*
- * Cleanly close an opened database.
+ * Cleanly close an opened database from Ruby.
  */
 VALUE
 rmdbx_close( VALUE self )
 {
 	UNWRAP_DB( self, db );
-	rmdbx_destroy( db );
+	rmdbx_close_all( db );
 	return Qtrue;
 }
 
@@ -96,8 +97,7 @@ rmdbx_close( VALUE self )
  * call-seq:
  *    db.closed? #=> false
  *
- * Predicate: return true if the database has been closed,
- * (or never was actually opened for some reason?)
+ * Predicate: return true if the database handle is closed.
  */
 VALUE
 rmdbx_closed_p( VALUE self )
@@ -126,7 +126,7 @@ rmdbx_open_txn( VALUE self, int rwflag )
 
 	if ( db->dbi == 0 ) {
 		// FIXME: dbi_flags
-		rc = mdbx_dbi_open( db->txn, NULL, 0, &db->dbi );
+		rc = mdbx_dbi_open( db->txn, db->subdb, MDBX_CREATE, &db->dbi );
 		if ( rc != MDBX_SUCCESS ) {
 			rmdbx_close( self );
 			rb_raise( rmdbx_eDatabaseError, "mdbx_dbi_open: (%d) %s", rc, mdbx_strerror(rc) );
@@ -138,15 +138,60 @@ rmdbx_open_txn( VALUE self, int rwflag )
 
 
 /*
+ * call-seq:
+ *    db.destroy
+ *
+ * Empty the database (or subdatabase) on disk.  Unrecoverable.
+ */
+VALUE
+rmdbx_destroy( VALUE self )
+{
+	UNWRAP_DB( self, db );
+	rmdbx_open_txn( self, MDBX_TXN_READWRITE );
+	int rc = mdbx_drop( db->txn, db->dbi, true );
+
+	// FIXME: something fishy here
+	//
+	if ( rc != 0 )
+		rb_raise( rmdbx_eDatabaseError, "mdbx_drop: (%d) %s", rc, mdbx_strerror(rc) );
+	mdbx_txn_commit( db->txn );
+	db->open = 0;
+	return Qnil;
+}
+
+
+/*
  * Given a ruby +arg+, convert and return a structure
- * suitable for usage as a key for mdbx.
+ * suitable for usage as a key for mdbx.  All keys are explicitly
+ * converted to strings.
  */
 MDBX_val
-rmdbx_vec_for( VALUE arg )
+rmdbx_key_for( VALUE arg )
 {
 	MDBX_val rv;
 
-	// FIXME: arbitrary data types!
+	arg = rb_funcall( arg, rb_intern("to_s"), 0 );
+	rv.iov_len  = RSTRING_LEN( arg );
+	rv.iov_base = StringValuePtr( arg );
+
+	return rv;
+}
+
+
+/*
+ * Given a ruby +arg+, convert and return a structure
+ * suitable for usage as a value for mdbx.
+ */
+MDBX_val
+rmdbx_val_for( VALUE self, VALUE arg )
+{
+	MDBX_val rv;
+	VALUE serialize_proc;
+
+	serialize_proc = rb_iv_get( self, "@serializer" );
+	if ( ! NIL_P( serialize_proc ) )
+		arg = rb_funcall( serialize_proc, rb_intern("call"), 1, arg );
+
 	rv.iov_len  = RSTRING_LEN( arg );
 	rv.iov_base = StringValuePtr( arg );
 
@@ -163,21 +208,27 @@ VALUE
 rmdbx_get_val( VALUE self, VALUE key )
 {
 	int rc;
+	VALUE deserialize_proc;
 	UNWRAP_DB( self, db );
 
 	if ( RTEST(rmdbx_closed_p(self)) ) rb_raise( rmdbx_eDatabaseError, "Closed database." );
 
 	rmdbx_open_txn( self, MDBX_TXN_RDONLY );
 
-	MDBX_val ckey = rmdbx_vec_for( key );
+	MDBX_val ckey = rmdbx_key_for( key );
 	MDBX_val data;
 	rc = mdbx_get( db->txn, db->dbi, &ckey, &data );
 	mdbx_txn_abort( db->txn );
 
 	switch ( rc ) {
 		case MDBX_SUCCESS:
-			// FIXME: arbitrary data types!
-			return rb_str_new2( data.iov_base );
+			deserialize_proc = rb_iv_get( self, "@deserializer" );
+			if ( ! NIL_P( deserialize_proc ) ) {
+				return rb_funcall( deserialize_proc, rb_intern("call"), 1, rb_str_new2(data.iov_base) );
+			}
+			else {
+				return rb_str_new2( data.iov_base );
+			}
 
 		case MDBX_NOTFOUND:
 			return Qnil;
@@ -203,7 +254,8 @@ rmdbx_put_val( VALUE self, VALUE key, VALUE val )
 	if ( RTEST(rmdbx_closed_p(self)) ) rb_raise( rmdbx_eDatabaseError, "Closed database." );
 
 	rmdbx_open_txn( self, MDBX_TXN_READWRITE );
-	MDBX_val ckey = rmdbx_vec_for( key );
+
+	MDBX_val ckey = rmdbx_key_for( key );
 
 	// FIXME: DUPSORT is enabled -- different api?
 	// See:  MDBX_NODUPDATA / MDBX_NOOVERWRITE
@@ -212,7 +264,7 @@ rmdbx_put_val( VALUE self, VALUE key, VALUE val )
 	}
 	else {
 		MDBX_val old;
-		MDBX_val data = rmdbx_vec_for( val );
+		MDBX_val data = rmdbx_val_for( self, val );
 		rc = mdbx_replace( db->txn, db->dbi, &ckey, &data, &old, 0 );
 	}
 
@@ -224,6 +276,45 @@ rmdbx_put_val( VALUE self, VALUE key, VALUE val )
 		default:
 			rb_raise( rmdbx_eDatabaseError, "Unable to store value: (%d) %s", rc, mdbx_strerror(rc) );
 	}
+}
+
+
+/*
+ * call-seq:
+ *    db.collection( 'collection_name' ) # => db
+ *    db.collection( nil ) # => db (main)
+ *
+ * Operate on a sub-database "collection".  Passing +nil+
+ * sets the database to the main, top-level namespace.
+ *
+ */
+VALUE
+rmdbx_set_subdb( int argc, VALUE *argv, VALUE self )
+/* rmdbx_set_subdb( VALUE self, VALUE subdb ) */
+{
+	UNWRAP_DB( self, db );
+	VALUE subdb;
+
+	rb_scan_args( argc, argv, "01", &subdb );
+	if ( argc == 0 ) {
+		if ( db->subdb == NULL ) return Qnil;
+		return rb_str_new2( db->subdb );
+	}
+
+	rb_iv_set( self, "@collection", subdb );
+	db->subdb = NIL_P( subdb ) ? NULL : StringValueCStr( subdb );
+
+	// Close any current dbi handle, to be re-opened with
+	// the new collection on next access.
+	//
+	// FIXME:  Immediate transaction write to auto-create new env
+	//
+	if ( db->dbi ) {
+		mdbx_dbi_close( db->env, db->dbi );
+		db->dbi = 0;
+	}
+
+	return self;
 }
 
 
@@ -299,12 +390,16 @@ rmdbx_database_initialize( int argc, VALUE *argv, VALUE self )
 	db->cursor    = NULL;
 	db->env_flags = env_flags;
 	db->open      = 0;
+	db->subdb     = NULL;
 
 	/* Allocate an mdbx environment.
 	 */
 	rc = mdbx_env_create( &db->env );
 	if ( rc != MDBX_SUCCESS )
 		rb_raise( rmdbx_eDatabaseError, "mdbx_env_create: (%d) %s", rc, mdbx_strerror(rc) );
+
+//FIXME: configurable	mdbx_env_set_maxdbs( db->env, 20 );
+	mdbx_env_set_maxdbs( db->env, 20 );
 
 	/* Open the DB handle on disk.
 	 */
@@ -335,8 +430,10 @@ rmdbx_init_database()
 	rb_define_alloc_func( rmdbx_cDatabase, rmdbx_alloc );
 
 	rb_define_protected_method( rmdbx_cDatabase, "initialize", rmdbx_database_initialize, -1 );
+	rb_define_method( rmdbx_cDatabase, "collection", rmdbx_set_subdb, -1 );
 	rb_define_method( rmdbx_cDatabase, "close", rmdbx_close, 0 );
 	rb_define_method( rmdbx_cDatabase, "closed?", rmdbx_closed_p, 0 );
+	rb_define_method( rmdbx_cDatabase, "destroy", rmdbx_destroy, 0 );
 	rb_define_method( rmdbx_cDatabase, "[]", rmdbx_get_val, 1 );
 	rb_define_method( rmdbx_cDatabase, "[]=", rmdbx_put_val, 2 );
 

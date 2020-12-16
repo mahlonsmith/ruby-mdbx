@@ -21,14 +21,21 @@ class MDBX::Database
 	###
 	def self::open( *args, &block )
 		db = new( *args )
-		return db unless block_given?
 
-		begin
-			yield db
-		ensure
-			db.close
+		db.serializer   = ->( v ) { Marshal.dump( v ) }
+		db.deserializer = ->( v ) { Marshal.load( v ) }
+
+		if block_given?
+			begin
+				yield db
+			ensure
+				db.close
+			end
 		end
+
+		return db
 	end
+
 
 	# Only instantiate Database objects via #open.
 	private_class_method :new
@@ -38,6 +45,12 @@ class MDBX::Database
 
 	# The path on disk of the database.
 	attr_reader :path
+
+	# A Proc for automatically serializing values.
+	attr_accessor :serializer
+
+	# A Proc for automatically deserializing values.
+	attr_accessor :deserializer
 
 end # class MDBX::Database
 

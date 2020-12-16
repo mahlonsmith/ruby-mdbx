@@ -17,14 +17,24 @@ RSpec.describe( MDBX::Database ) do
 		expect( db.closed? ).to be_truthy
 	end
 
+	it "closes itself automatically when used in block form" do
+		db = described_class.open( TEST_DATABASE.to_s ) do |db|
+			expect( db.closed? ).to be_falsey
+		end
+		expect( db.closed? ).to be_truthy
+	end
+
+
 	context 'an opened database' do
 
-		before( :each ) do
-			@db = described_class.open( TEST_DATABASE.to_s )
-		end
+		let!( :db ) { described_class.open( TEST_DATABASE.to_s ) }
 
 		after( :each ) do
-			@db.close
+			db.close
+		end
+
+		it "knows its own path" do
+			expect( db.path ).to match( %r|data/testdb$| )
 		end
 
 		it "fails if opened again within the same process" do
@@ -34,6 +44,16 @@ RSpec.describe( MDBX::Database ) do
 				described_class.open( TEST_DATABASE.to_s )
 			}.
 			to raise_exception( MDBX::DatabaseError, /environment is already used/ )
+		end
+
+		it "defaults to the top-level namespace" do
+			expect( db.collection ).to be_nil
+		end
+
+		it "can set a collection namespace" do
+			db.collection( 'bucket' )
+			expect( db.collection ).to eq( 'bucket' )
+			# TODO: set/retrieve data
 		end
 
 	end
