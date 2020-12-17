@@ -14,7 +14,7 @@ require 'mdbx'
 
 
 module MDBX::Testing
-	TEST_DATABASE = Pathname( __FILE__ ).parent.parent + 'data' + 'testdb'
+	TEST_DATABASE = Pathname( __FILE__ ).parent.parent.parent + 'tmp' + 'testdb'
 end
 
 

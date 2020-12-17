@@ -9,7 +9,6 @@ require 'mdbx' unless defined?( MDBX )
 #
 class MDBX::Database
 
-
 	### Open an existing (or create a new) mdbx database at filesystem
 	### +path+.  In block form, the database is automatically closed.
 	###
@@ -40,6 +39,7 @@ class MDBX::Database
 	# Only instantiate Database objects via #open.
 	private_class_method :new
 
+
 	# The options used to instantiate this database.
 	attr_reader :options
 
@@ -51,6 +51,18 @@ class MDBX::Database
 
 	# A Proc for automatically deserializing values.
 	attr_accessor :deserializer
+
+
+	# Allow for some common nomenclature.
+	alias_method :namespace, :collection
+	alias_method :reopen, :open
+
+
+	### Switch to the top-level collection.
+	###
+	def main
+		return self.collection( nil )
+	end
 
 end # class MDBX::Database
 
