@@ -1,21 +1,22 @@
 # Ruby MDBX
 
 home
-: https://gitlab.com/mahlon/ruby-mdbx
+: https://code.martini.nu/ruby-mdbx
 
 code
 : https://code.martini.nu/ruby-mdbx
+
+docs
+: https://martini.nu/docs/ruby-mdbx
 
 github
 : https://github.com/mahlon/ruby-mdbx
 
 gitlab
-: https://gitlab.com/mahlon/ruby-mdbx/-/tree-master
+: https://gitlab.com/mahlon/ruby-mdbx
 
-
-docs
-: https://martini.nu/docs/ruby-mdbx
-#FIXME: ....... somewhere on martini
+sourcehut:
+: https://hg.sr.ht/~mahlon/ruby-mdbx
 
 
 ## Description

@@ -1,3 +1,9 @@
 History.md
-LICENSE.txt
 README.md
+ext/mdbx_ext/extconf.rb
+ext/mdbx_ext/mdbx_ext.c
+ext/mdbx_ext/mdbx_ext.h
+ext/mdbx_ext/database.c
+lib/mdbx.rb
+lib/mdbx_ext.so
+lib/mdbx/database.rb

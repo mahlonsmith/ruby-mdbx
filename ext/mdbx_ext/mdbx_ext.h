@@ -15,6 +15,7 @@
 extern VALUE rmdbx_mMDBX;
 extern VALUE rmdbx_cDatabase;
 extern VALUE rmdbx_eDatabaseError;
+extern VALUE rmdbx_eRollback;
 
 
 /* ------------------------------------------------------------

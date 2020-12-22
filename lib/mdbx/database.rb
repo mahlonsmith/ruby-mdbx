@@ -18,6 +18,8 @@ class MDBX::Database
 	###        db[ 'key' ] #=> value
 	###    end
 	###
+	### FIXME: options!
+	###
 	def self::open( *args, &block )
 		db = new( *args )
 
@@ -53,16 +55,14 @@ class MDBX::Database
 	attr_accessor :deserializer
 
 
-	# Allow for some common nomenclature.
-	alias_method :namespace, :collection
-	alias_method :reopen, :open
-
-
 	### Switch to the top-level collection.
 	###
 	def main
 		return self.collection( nil )
 	end
+
+	# Allow for some common nomenclature.
+	alias_method :namespace, :collection
 
 end # class MDBX::Database
 

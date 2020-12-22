@@ -1,0 +1,26 @@
+image: freebsd/12.x
+shell: true
+packages:
+  - ruby
+sources:
+  - hg+https://hg.sr.ht/~mahlon/ruby-mdbx
+tasks:
+  - env-setup: |
+      sudo sh -c 'echo "DEFAULT_VERSIONS+=ruby=2.7" > /etc/make.conf'
+      sudo portsnap fetch extract
+      cd /usr/ports/devel/ruby-gems
+      sudo make -DBATCH install
+      cd /usr/ports/databases/mdbx
+      sudo make -DBATCH install
+  - project-setup: |
+      cd ~/ruby-mdbx
+      sudo gem install -Ng
+  - test: |
+      export LC_ALL=en_US.UTF-8
+      cd ~/ruby-mdbx
+      rake test
+triggers:
+  - action: email
+    condition: always
+    to: mahlon@martini.nu
+

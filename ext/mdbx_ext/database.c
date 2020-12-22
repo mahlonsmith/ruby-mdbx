@@ -113,6 +113,7 @@ rmdbx_open_env( VALUE self )
 		rb_raise( rmdbx_eDatabaseError, "mdbx_env_create: (%d) %s", rc, mdbx_strerror(rc) );
 
 	/* Set the maximum number of named databases for the environment. */
+	// FIXME: potenially more env setups here?  maxreaders, pagesize?
 	mdbx_env_set_maxdbs( db->env, db->max_collections );
 
 	rc = mdbx_env_open( db->env, db->path, db->env_flags, db->mode );
@@ -184,18 +185,13 @@ rmdbx_clear( VALUE self )
 	rmdbx_open_txn( self, MDBX_TXN_READWRITE );
 	int rc = mdbx_drop( db->txn, db->dbi, true );
 
-	if ( rc != 0 )
+	if ( rc != MDBX_SUCCESS )
 		rb_raise( rmdbx_eDatabaseError, "mdbx_drop: (%d) %s", rc, mdbx_strerror(rc) );
 
 	mdbx_txn_commit( db->txn );
 
-	// Close the current handle, will be re-opened
-	// on the next txn.
-	//
-	if ( db->dbi ) {
-		mdbx_dbi_close( db->env, db->dbi );
-		db->dbi = 0;
-	}
+	/* Refresh the environment handles. */
+	rmdbx_open_env( self );
 
 	return Qnil;
 }
@@ -263,10 +259,12 @@ rmdbx_keys( VALUE self )
 		rb_raise( rmdbx_eDatabaseError, "Unable to open cursor: (%d) %s", rc, mdbx_strerror(rc) );
 	}
 
-	mdbx_cursor_get( db->cursor, &key, &data, MDBX_FIRST );
-	rb_ary_push( rv, rb_str_new( key.iov_base, key.iov_len ) );
-	while ( mdbx_cursor_get( db->cursor, &key, &data, MDBX_NEXT ) == 0 ) {
+	rc = mdbx_cursor_get( db->cursor, &key, &data, MDBX_FIRST );
+	if ( rc == MDBX_SUCCESS ) {
 		rb_ary_push( rv, rb_str_new( key.iov_base, key.iov_len ) );
+		while ( mdbx_cursor_get( db->cursor, &key, &data, MDBX_NEXT ) == 0 ) {
+			rb_ary_push( rv, rb_str_new( key.iov_base, key.iov_len ) );
+		}
 	}
 
 	mdbx_cursor_close( db->cursor );
@@ -300,12 +298,10 @@ rmdbx_get_val( VALUE self, VALUE key )
 	switch ( rc ) {
 		case MDBX_SUCCESS:
 			deserialize_proc = rb_iv_get( self, "@deserializer" );
-			if ( ! NIL_P( deserialize_proc ) ) {
-				return rb_funcall( deserialize_proc, rb_intern("call"), 1, rb_str_new_cstr(data.iov_base) );
-			}
-			else {
-				return rb_str_new_cstr( data.iov_base );
-			}
+			VALUE rv = rb_str_new( data.iov_base, data.iov_len );
+			if ( ! NIL_P( deserialize_proc ) )
+				return rb_funcall( deserialize_proc, rb_intern("call"), 1, rv );
+			return rv;
 
 		case MDBX_NOTFOUND:
 			return Qnil;
@@ -384,7 +380,7 @@ rmdbx_set_subdb( int argc, VALUE *argv, VALUE self )
 
 	/* Close any currently open dbi handle, to be re-opened with
 	 * the new collection on next access.
-	 * 
+	 *
 	  FIXME:  Immediate transaction write to auto-create new env?
 	  Fetching from here at the moment causes an error if you
 	  haven't written anything yet.
@@ -494,12 +490,16 @@ rmdbx_init_database()
 {
 	rmdbx_cDatabase = rb_define_class_under( rmdbx_mMDBX, "Database", rb_cData );
 
+#ifdef FOR_RDOC
+	rmdbx_mMDBX = rb_define_module( "MDBX" );
+#endif
+
 	rb_define_alloc_func( rmdbx_cDatabase, rmdbx_alloc );
 
 	rb_define_protected_method( rmdbx_cDatabase, "initialize", rmdbx_database_initialize, -1 );
 	rb_define_method( rmdbx_cDatabase, "collection", rmdbx_set_subdb, -1 );
 	rb_define_method( rmdbx_cDatabase, "close", rmdbx_close, 0 );
-	rb_define_method( rmdbx_cDatabase, "open", rmdbx_open_env, 0 );
+	rb_define_method( rmdbx_cDatabase, "reopen", rmdbx_open_env, 0 );
 	rb_define_method( rmdbx_cDatabase, "closed?", rmdbx_closed_p, 0 );
 	rb_define_method( rmdbx_cDatabase, "clear", rmdbx_clear, 0 );
 	rb_define_method( rmdbx_cDatabase, "keys", rmdbx_keys, 0 );
