@@ -18,7 +18,7 @@ class MDBX::Database
 	###        db[ 'key' ] #=> value
 	###    end
 	###
-	### FIXME: options!
+	### FIXME: document all options!
 	###
 	def self::open( *args, &block )
 		db = new( *args )
@@ -63,6 +63,32 @@ class MDBX::Database
 
 	# Allow for some common nomenclature.
 	alias_method :namespace, :collection
+
+
+	### Return a hash of various metadata for the current database.
+	###
+	def statistics
+		raw = self.raw_stats
+
+		# Place build options in their own hash.
+		#
+		build_opts = raw.delete( :build_options ).split.each_with_object( {} ) do |opt, acc|
+			key, val = opt.split( '=' )
+			acc[ key.to_sym ] = Integer( val ) rescue val
+		end
+
+		stats = {
+			build: {
+				compiler: raw.delete( :build_compiler ),
+				flags:    raw.delete( :build_flags ),
+				options:  build_opts,
+				target:   raw.delete( :build_target )
+			}
+		}
+		stats.merge!( raw )
+
+		return stats
+	end
 
 end # class MDBX::Database
 
