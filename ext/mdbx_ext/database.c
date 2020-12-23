@@ -2,42 +2,18 @@
 
 #include "mdbx_ext.h"
 
-/* VALUE str = rb_sprintf( "path: %+"PRIsVALUE", opts: %+"PRIsVALUE, path, opts ); */
-/* printf( "%s\n", StringValueCStr(str) ); */
-
-VALUE rmdbx_cDatabase;
-
-
 /* Shortcut for fetching current DB variables.
- *
  */
 #define UNWRAP_DB( val, db ) \
 	rmdbx_db_t *db; \
 	TypedData_Get_Struct( val, rmdbx_db_t, &rmdbx_db_data, db );
 
 
-/*
- * A struct encapsulating an instance's DB state.
- */
-struct rmdbx_db {
-	MDBX_env *env;
-	MDBX_dbi dbi;
-	MDBX_txn *txn;
-	MDBX_cursor *cursor;
-	int env_flags;
-	int mode;
-	int open;
-	int max_collections;
-	char *path;
-	char *subdb;
-};
-typedef struct rmdbx_db rmdbx_db_t;
-
+VALUE rmdbx_cDatabase;
 
 /*
  * Ruby allocation hook.
  */
-void rmdbx_free( void *db );  /* forward declaration */
 static const rb_data_type_t rmdbx_db_data = {
 	.wrap_struct_name = "MDBX::Database::Data",
 	.function = { .dfree = rmdbx_free },
@@ -61,13 +37,13 @@ rmdbx_alloc( VALUE klass )
  * removed.
  */
 void
-rmdbx_close_all( rmdbx_db_t* db )
+rmdbx_close_all( rmdbx_db_t *db )
 {
 	if ( db->cursor ) mdbx_cursor_close( db->cursor );
 	if ( db->txn )    mdbx_txn_abort( db->txn );
 	if ( db->dbi )    mdbx_dbi_close( db->env, db->dbi );
 	if ( db->env )    mdbx_env_close( db->env );
-	db->open = 0;
+	db->state.open = 0;
 }
 
 
@@ -97,6 +73,20 @@ rmdbx_close( VALUE self )
 
 
 /*
+ * call-seq:
+ *    db.closed? #=> false
+ *
+ * Predicate: return true if the database environment is closed.
+ */
+VALUE
+rmdbx_closed_p( VALUE self )
+{
+	UNWRAP_DB( self, db );
+	return db->state.open == 1 ? Qfalse : Qtrue;
+}
+
+
+/*
  * Open the DB environment handle.
  */
 VALUE
@@ -113,48 +103,41 @@ rmdbx_open_env( VALUE self )
 		rb_raise( rmdbx_eDatabaseError, "mdbx_env_create: (%d) %s", rc, mdbx_strerror(rc) );
 
 	/* Set the maximum number of named databases for the environment. */
-	// FIXME: potenially more env setups here?  maxreaders, pagesize?
-	mdbx_env_set_maxdbs( db->env, db->max_collections );
+	mdbx_env_set_maxdbs( db->env, db->settings.max_collections );
 
-	rc = mdbx_env_open( db->env, db->path, db->env_flags, db->mode );
+	/* Customize the maximum number of simultaneous readers. */
+	if ( db->settings.max_readers )
+		mdbx_env_set_maxreaders( db->env, db->settings.max_readers );
+
+	/* Set an upper boundary (in bytes) for the database map size. */
+	if ( db->settings.max_size > -1 )
+		mdbx_env_set_geometry( db->env, -1, -1, db->settings.max_size, -1, -1, -1 );
+
+	rc = mdbx_env_open( db->env, db->path, db->settings.env_flags, db->settings.mode );
 	if ( rc != MDBX_SUCCESS ) {
-		rmdbx_close( self );
+		rmdbx_close_all( db );
 		rb_raise( rmdbx_eDatabaseError, "mdbx_env_open: (%d) %s", rc, mdbx_strerror(rc) );
 	}
-	db->open = 1;
+	db->state.open = 1;
 
 	return Qtrue;
 }
 
 
 /*
- * call-seq:
- *    db.closed? #=> false
- *
- * Predicate: return true if the database environment is closed.
- */
-VALUE
-rmdbx_closed_p( VALUE self )
-{
-	UNWRAP_DB( self, db );
-	return db->open == 1 ? Qfalse : Qtrue;
-}
-
-
-/*
- * Open a new database transaction.
+ * Open a new database transaction.  If a transaction is already
+ * open, this is a no-op.
  *
  * +rwflag+ must be either MDBX_TXN_RDONLY or MDBX_TXN_READWRITE.
  */
 void
-rmdbx_open_txn( VALUE self, int rwflag )
+rmdbx_open_txn( rmdbx_db_t *db, int rwflag )
 {
-	int rc;
-	UNWRAP_DB( self, db );
+	if ( db->txn ) return;
 
-	rc = mdbx_txn_begin( db->env, NULL, rwflag, &db->txn);
+	int rc = mdbx_txn_begin( db->env, NULL, rwflag, &db->txn);
 	if ( rc != MDBX_SUCCESS ) {
-		rmdbx_close( self );
+		rmdbx_close_all( db );
 		rb_raise( rmdbx_eDatabaseError, "mdbx_txn_begin: (%d) %s", rc, mdbx_strerror(rc) );
 	}
 
@@ -162,11 +145,37 @@ rmdbx_open_txn( VALUE self, int rwflag )
 		// FIXME: dbi_flags
 		rc = mdbx_dbi_open( db->txn, db->subdb, MDBX_CREATE, &db->dbi );
 		if ( rc != MDBX_SUCCESS ) {
-			rmdbx_close( self );
+			rmdbx_close_all( db );
 			rb_raise( rmdbx_eDatabaseError, "mdbx_dbi_open: (%d) %s", rc, mdbx_strerror(rc) );
 		}
 	}
 
+	return;
+}
+
+
+/*
+ * Close any existing database transaction. If there is no
+ * active transaction, this is a no-op.
+ *
+ * FIXME: this needs a conditional no-op for long running
+ * transactions, so callers don't have to care/check
+ *
+ * +txnflag must either be RMDBX_TXN_ROLLBACK or RMDBX_TXN_COMMIT.
+ */
+void
+rmdbx_close_txn( rmdbx_db_t *db, int txnflag )
+{
+	if ( ! db->txn ) return;
+
+	switch ( txnflag ) {
+		case RMDBX_TXN_COMMIT:
+			mdbx_txn_commit( db->txn );
+		default:
+			mdbx_txn_abort( db->txn );
+	}
+
+	db->txn = 0;
 	return;
 }
 
@@ -182,13 +191,13 @@ rmdbx_clear( VALUE self )
 {
 	UNWRAP_DB( self, db );
 
-	rmdbx_open_txn( self, MDBX_TXN_READWRITE );
+	rmdbx_open_txn( db, MDBX_TXN_READWRITE );
 	int rc = mdbx_drop( db->txn, db->dbi, true );
 
 	if ( rc != MDBX_SUCCESS )
 		rb_raise( rmdbx_eDatabaseError, "mdbx_drop: (%d) %s", rc, mdbx_strerror(rc) );
 
-	mdbx_txn_commit( db->txn );
+	rmdbx_close_txn( db, RMDBX_TXN_COMMIT );
 
 	/* Refresh the environment handles. */
 	rmdbx_open_env( self );
@@ -249,9 +258,9 @@ rmdbx_keys( VALUE self )
 	MDBX_val key, data;
 	int rc;
 
-	if ( ! db->open ) rb_raise( rmdbx_eDatabaseError, "Closed database." );
+	if ( ! db->state.open ) rb_raise( rmdbx_eDatabaseError, "Closed database." );
 
-	rmdbx_open_txn( self, MDBX_TXN_RDONLY );
+	rmdbx_open_txn( db, MDBX_TXN_RDONLY );
 	rc = mdbx_cursor_open( db->txn, db->dbi, &db->cursor);
 
 	if ( rc != MDBX_SUCCESS ) {
@@ -269,7 +278,7 @@ rmdbx_keys( VALUE self )
 
 	mdbx_cursor_close( db->cursor );
 	db->cursor = NULL;
-	mdbx_txn_abort( db->txn );
+	rmdbx_close_txn( db, RMDBX_TXN_ROLLBACK );
 	return rv;
 }
 
@@ -286,14 +295,14 @@ rmdbx_get_val( VALUE self, VALUE key )
 	VALUE deserialize_proc;
 	UNWRAP_DB( self, db );
 
-	if ( ! db->open ) rb_raise( rmdbx_eDatabaseError, "Closed database." );
+	if ( ! db->state.open ) rb_raise( rmdbx_eDatabaseError, "Closed database." );
 
-	rmdbx_open_txn( self, MDBX_TXN_RDONLY );
+	rmdbx_open_txn( db, MDBX_TXN_RDONLY );
 
 	MDBX_val ckey = rmdbx_key_for( key );
 	MDBX_val data;
 	rc = mdbx_get( db->txn, db->dbi, &ckey, &data );
-	mdbx_txn_abort( db->txn );
+	rmdbx_close_txn( db, RMDBX_TXN_ROLLBACK );
 
 	switch ( rc ) {
 		case MDBX_SUCCESS:
@@ -324,9 +333,9 @@ rmdbx_put_val( VALUE self, VALUE key, VALUE val )
 	int rc;
 	UNWRAP_DB( self, db );
 
-	if ( ! db->open ) rb_raise( rmdbx_eDatabaseError, "Closed database." );
+	if ( ! db->state.open ) rb_raise( rmdbx_eDatabaseError, "Closed database." );
 
-	rmdbx_open_txn( self, MDBX_TXN_READWRITE );
+	rmdbx_open_txn( db, MDBX_TXN_READWRITE );
 
 	MDBX_val ckey = rmdbx_key_for( key );
 
@@ -341,7 +350,7 @@ rmdbx_put_val( VALUE self, VALUE key, VALUE val )
 		rc = mdbx_replace( db->txn, db->dbi, &ckey, &data, &old, 0 );
 	}
 
-	mdbx_txn_commit( db->txn );
+	rmdbx_close_txn( db, RMDBX_TXN_COMMIT );
 
 	switch ( rc ) {
 		case MDBX_SUCCESS:
@@ -351,6 +360,24 @@ rmdbx_put_val( VALUE self, VALUE key, VALUE val )
 		default:
 			rb_raise( rmdbx_eDatabaseError, "Unable to store value: (%d) %s", rc, mdbx_strerror(rc) );
 	}
+}
+
+
+/*
+ * call-seq:
+ *    db.statistics #=> (hash of stats)
+ *
+ * Returns a hash populated with various metadata for the opened
+ * database.
+ *
+ */
+VALUE
+rmdbx_stats( VALUE self )
+{
+	UNWRAP_DB( self, db );
+	if ( ! db->state.open ) rb_raise( rmdbx_eDatabaseError, "Closed database." );
+
+	return rmdbx_gather_stats( db );
 }
 
 
@@ -409,11 +436,7 @@ rmdbx_set_subdb( int argc, VALUE *argv, VALUE self )
 VALUE
 rmdbx_database_initialize( int argc, VALUE *argv, VALUE self )
 {
-	int mode            = 0644;
-	int max_collections = 0;
-	int env_flags       = MDBX_ENV_DEFAULTS;
 	VALUE path, opts, opt;
-
 	rb_scan_args( argc, argv, "11", &path, &opts );
 
 	/* Ensure options is a hash if it was passed in.
@@ -426,51 +449,57 @@ rmdbx_database_initialize( int argc, VALUE *argv, VALUE self )
 	}
 	rb_hash_freeze( opts );
 
-	/* Options setup, overrides.
-	 */
-	opt = rb_hash_aref( opts, ID2SYM( rb_intern("mode") ) );
-	if ( ! NIL_P(opt) ) mode = FIX2INT( opt );
-	opt = rb_hash_aref( opts, ID2SYM( rb_intern("max_collections") ) );
-	if ( ! NIL_P(opt) ) max_collections = FIX2INT( opt );
-	opt = rb_hash_aref( opts, ID2SYM( rb_intern("nosubdir") ) );
-	if ( RTEST(opt) ) env_flags = env_flags | MDBX_NOSUBDIR;
-	opt = rb_hash_aref( opts, ID2SYM( rb_intern("readonly") ) );
-	if ( RTEST(opt) ) env_flags = env_flags | MDBX_RDONLY;
-	opt = rb_hash_aref( opts, ID2SYM( rb_intern("exclusive") ) );
-	if ( RTEST(opt) ) env_flags = env_flags | MDBX_EXCLUSIVE;
-	opt = rb_hash_aref( opts, ID2SYM( rb_intern("compat") ) );
-	if ( RTEST(opt) ) env_flags = env_flags | MDBX_ACCEDE;
-	opt = rb_hash_aref( opts, ID2SYM( rb_intern("writemap") ) );
-	if ( RTEST(opt) ) env_flags = env_flags | MDBX_WRITEMAP;
-	opt = rb_hash_aref( opts, ID2SYM( rb_intern("no_threadlocal") ) );
-	if ( RTEST(opt) ) env_flags = env_flags | MDBX_NOTLS;
-	opt = rb_hash_aref( opts, ID2SYM( rb_intern("no_readahead") ) );
-	if ( RTEST(opt) ) env_flags = env_flags | MDBX_NORDAHEAD;
-	opt = rb_hash_aref( opts, ID2SYM( rb_intern("no_memory_init") ) );
-	if ( RTEST(opt) ) env_flags = env_flags | MDBX_NOMEMINIT;
-	opt = rb_hash_aref( opts, ID2SYM( rb_intern("coalesce") ) );
-	if ( RTEST(opt) ) env_flags = env_flags | MDBX_COALESCE;
-	opt = rb_hash_aref( opts, ID2SYM( rb_intern("lifo_reclaim") ) );
-	if ( RTEST(opt) ) env_flags = env_flags | MDBX_LIFORECLAIM;
-	opt = rb_hash_aref( opts, ID2SYM( rb_intern("no_metasync") ) );
-	if ( RTEST(opt) ) env_flags = env_flags | MDBX_NOMETASYNC;
-
-	/* Duplicate keys, on mdbx_dbi_open, maybe set here? */
-	/* MDBX_DUPSORT = UINT32_C(0x04), */
-
 	/* Initialize the DB vals.
 	 */
 	UNWRAP_DB( self, db );
-	db->env       = NULL;
-	db->dbi       = 0;
-	db->txn       = NULL;
-	db->cursor    = NULL;
-	db->env_flags = env_flags;
-	db->mode      = mode;
-	db->max_collections = max_collections;
-	db->path      = StringValueCStr( path );
-	db->open      = 0;
-	db->subdb     = NULL;
+	db->env    = NULL;
+	db->dbi    = 0;
+	db->txn    = NULL;
+	db->cursor = NULL;
+	db->path   = StringValueCStr( path );
+	db->subdb  = NULL;
+	db->state.open = 0;
+	db->settings.env_flags       = MDBX_ENV_DEFAULTS;
+	db->settings.mode            = 0644;
+	db->settings.max_collections = 0;
+	db->settings.max_readers     = 0;
+	db->settings.max_size        = -1;
+
+	/* Options setup, overrides.
+	 */
+	opt = rb_hash_aref( opts, ID2SYM( rb_intern("mode") ) );
+	if ( ! NIL_P(opt) ) db->settings.mode = FIX2INT( opt );
+	opt = rb_hash_aref( opts, ID2SYM( rb_intern("max_collections") ) );
+	if ( ! NIL_P(opt) ) db->settings.max_collections = FIX2INT( opt );
+	opt = rb_hash_aref( opts, ID2SYM( rb_intern("max_readers") ) );
+	if ( ! NIL_P(opt) ) db->settings.max_readers = FIX2INT( opt );
+	opt = rb_hash_aref( opts, ID2SYM( rb_intern("max_size") ) );
+	if ( ! NIL_P(opt) ) db->settings.max_size = NUM2LONG( opt );
+	opt = rb_hash_aref( opts, ID2SYM( rb_intern("nosubdir") ) );
+	if ( RTEST(opt) ) db->settings.env_flags = db->settings.env_flags | MDBX_NOSUBDIR;
+	opt = rb_hash_aref( opts, ID2SYM( rb_intern("readonly") ) );
+	if ( RTEST(opt) ) db->settings.env_flags = db->settings.env_flags | MDBX_RDONLY;
+	opt = rb_hash_aref( opts, ID2SYM( rb_intern("exclusive") ) );
+	if ( RTEST(opt) ) db->settings.env_flags = db->settings.env_flags | MDBX_EXCLUSIVE;
+	opt = rb_hash_aref( opts, ID2SYM( rb_intern("compat") ) );
+	if ( RTEST(opt) ) db->settings.env_flags = db->settings.env_flags | MDBX_ACCEDE;
+	opt = rb_hash_aref( opts, ID2SYM( rb_intern("writemap") ) );
+	if ( RTEST(opt) ) db->settings.env_flags = db->settings.env_flags | MDBX_WRITEMAP;
+	opt = rb_hash_aref( opts, ID2SYM( rb_intern("no_threadlocal") ) );
+	if ( RTEST(opt) ) db->settings.env_flags = db->settings.env_flags | MDBX_NOTLS;
+	opt = rb_hash_aref( opts, ID2SYM( rb_intern("no_readahead") ) );
+	if ( RTEST(opt) ) db->settings.env_flags = db->settings.env_flags | MDBX_NORDAHEAD;
+	opt = rb_hash_aref( opts, ID2SYM( rb_intern("no_memory_init") ) );
+	if ( RTEST(opt) ) db->settings.env_flags = db->settings.env_flags | MDBX_NOMEMINIT;
+	opt = rb_hash_aref( opts, ID2SYM( rb_intern("coalesce") ) );
+	if ( RTEST(opt) ) db->settings.env_flags = db->settings.env_flags | MDBX_COALESCE;
+	opt = rb_hash_aref( opts, ID2SYM( rb_intern("lifo_reclaim") ) );
+	if ( RTEST(opt) ) db->settings.env_flags = db->settings.env_flags | MDBX_LIFORECLAIM;
+	opt = rb_hash_aref( opts, ID2SYM( rb_intern("no_metasync") ) );
+	if ( RTEST(opt) ) db->settings.env_flags = db->settings.env_flags | MDBX_NOMETASYNC;
+
+	/* Duplicate keys, on mdbx_dbi_open, maybe set here? */
+	/* MDBX_DUPSORT = UINT32_C(0x04), */
 
 	/* Set instance variables.
 	 */
@@ -505,6 +534,8 @@ rmdbx_init_database()
 	rb_define_method( rmdbx_cDatabase, "keys", rmdbx_keys, 0 );
 	rb_define_method( rmdbx_cDatabase, "[]", rmdbx_get_val, 1 );
 	rb_define_method( rmdbx_cDatabase, "[]=", rmdbx_put_val, 2 );
+
+	rb_define_protected_method( rmdbx_cDatabase, "raw_stats", rmdbx_stats, 0 );
 
 	rb_require( "mdbx/database" );
 }
