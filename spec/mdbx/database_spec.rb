@@ -1,4 +1,5 @@
 #!/usr/bin/env rspec -cfd
+# vim: set nosta noet ts=4 sw=4 ft=ruby:
 
 require_relative '../lib/helper'
 
@@ -111,6 +112,12 @@ RSpec.describe( MDBX::Database ) do
 			db.main
 			expect( db.collection ).to be_nil
 			expect( db['key'] ).to be_truthy
+		end
+
+		it "revert back to the previous collection when used in a block" do
+			expect( db.collection ).to be_nil
+			db.collection( 'bucket' ) { 'no-op' }
+			expect( db.collection ).to be_nil
 		end
 
 		it "can be cleared of contents" do

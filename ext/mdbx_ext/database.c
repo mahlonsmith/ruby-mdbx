@@ -48,6 +48,20 @@ rmdbx_close_all( rmdbx_db_t *db )
 
 
 /*
+ * Close any open database handle.  Will be automatically
+ * re-opened on next transaction.  This is primarily useful for
+ * switching between subdatabases.
+ */
+void
+rmdbx_close_dbi( rmdbx_db_t *db )
+{
+	if ( ! db->dbi ) return;
+	mdbx_dbi_close( db->env, db->dbi );
+	db->dbi = 0;
+}
+
+
+/*
  * Cleanup a previously allocated DB environment.
  */
 void
@@ -83,6 +97,21 @@ rmdbx_closed_p( VALUE self )
 {
 	UNWRAP_DB( self, db );
 	return db->state.open == 1 ? Qfalse : Qtrue;
+}
+
+
+/*
+ * call-seq:
+ *    db.in_transaction? #=> false
+ *
+ * Predicate: return true if a transaction (or snapshot)
+ * is currently open.
+ */
+VALUE
+rmdbx_in_transaction_p( VALUE self )
+{
+	UNWRAP_DB( self, db );
+	return db->txn ? Qtrue : Qfalse;
 }
 
 
@@ -156,17 +185,15 @@ rmdbx_open_txn( rmdbx_db_t *db, int rwflag )
 
 /*
  * Close any existing database transaction. If there is no
- * active transaction, this is a no-op.
- *
- * FIXME: this needs a conditional no-op for long running
- * transactions, so callers don't have to care/check
+ * active transaction, this is a no-op.  If there is a long
+ * running transaction open, this is a no-op.
  *
  * +txnflag must either be RMDBX_TXN_ROLLBACK or RMDBX_TXN_COMMIT.
  */
 void
 rmdbx_close_txn( rmdbx_db_t *db, int txnflag )
 {
-	if ( ! db->txn ) return;
+	if ( ! db->txn || db->state.retain_txn > -1 ) return;
 
 	switch ( txnflag ) {
 		case RMDBX_TXN_COMMIT:
@@ -177,6 +204,46 @@ rmdbx_close_txn( rmdbx_db_t *db, int txnflag )
 
 	db->txn = 0;
 	return;
+}
+
+
+/*
+ * call-seq:
+ *    db.open_transaction( mode )
+ *
+ * Open a new long-running transaction.  If +mode+ is true,
+ * it is opened read/write.
+ *
+ */
+VALUE
+rmdbx_rb_opentxn( VALUE self, VALUE mode )
+{
+	UNWRAP_DB( self, db );
+
+	rmdbx_open_txn( db, RTEST(mode) ? MDBX_TXN_READWRITE : MDBX_TXN_RDONLY );
+	db->state.retain_txn = RTEST(mode) ? 1 : 0;
+
+	return Qtrue;
+}
+
+
+/*
+ * call-seq:
+ *    db.close_transaction( mode )
+ *
+ * Close a long-running transaction.  If +write+ is true,
+ * the transaction is committed.  Otherwise, rolled back.
+ *
+ */
+VALUE
+rmdbx_rb_closetxn( VALUE self, VALUE write )
+{
+	UNWRAP_DB( self, db );
+
+	db->state.retain_txn = -1;
+	rmdbx_close_txn( db, RTEST(write) ? RMDBX_TXN_COMMIT : RMDBX_TXN_ROLLBACK );
+
+	return Qtrue;
 }
 
 
@@ -382,39 +449,63 @@ rmdbx_stats( VALUE self )
 
 
 /*
- * call-seq:
+ * Gets or sets the sub-database "collection" that read/write operations apply to.
+ * Passing +nil+ sets the database to the main, top-level namespace.
+ * If a block is passed, the collection automatically reverts to the
+ * prior collection when it exits.
+ *
  *    db.collection( 'collection_name' ) # => db
  *    db.collection( nil ) # => db (main)
  *
- * Operate on a sub-database "collection".  Passing +nil+
- * sets the database to the main, top-level namespace.
+ *    db.collection( 'collection_name' ) do
+ *        [ ... ]
+ *    end #=> reverts to the previous collection name
  *
  */
 VALUE
 rmdbx_set_subdb( int argc, VALUE *argv, VALUE self )
 {
 	UNWRAP_DB( self, db );
-	VALUE subdb;
+	VALUE subdb, block;
+	char *prev_db = NULL;
 
-	rb_scan_args( argc, argv, "01", &subdb );
+	rb_scan_args( argc, argv, "01&", &subdb, &block );
 	if ( argc == 0 ) {
 		if ( db->subdb == NULL ) return Qnil;
 		return rb_str_new_cstr( db->subdb );
 	}
 
+	/* All transactions must be closed when switching database handles. */
+	if ( db->txn ) rb_raise( rmdbx_eDatabaseError, "Unable to change collection: finish current transaction" );
+
+	/* Retain the prior database collection if a
+	 * block was passed. */
+	if ( rb_block_given_p() ) {
+		if ( db->subdb != NULL ) {
+			prev_db = (char *) malloc( strlen(db->subdb) + 1 );
+			strcpy( prev_db, db->subdb );
+		}
+	}
+
 	rb_iv_set( self, "@collection", subdb );
 	db->subdb = NIL_P( subdb ) ? NULL : StringValueCStr( subdb );
+	rmdbx_close_dbi( db );
 
-	/* Close any currently open dbi handle, to be re-opened with
-	 * the new collection on next access.
-	 *
+	/*
 	  FIXME:  Immediate transaction write to auto-create new env?
 	  Fetching from here at the moment causes an error if you
-	  haven't written anything yet.
+	  haven't written anything to the new collection yet.
 	 */
-	if ( db->dbi ) {
-		mdbx_dbi_close( db->env, db->dbi );
-		db->dbi = 0;
+
+	/* Revert to the previous collection after the block is done. */
+	if ( rb_block_given_p() ) {
+		rb_yield( self );
+		if ( db->subdb != prev_db ) {
+			rb_iv_set( self, "@collection", prev_db ? rb_str_new_cstr(prev_db) : Qnil );
+			db->subdb = prev_db;
+			rmdbx_close_dbi( db );
+		}
+		free( prev_db );
 	}
 
 	return self;
@@ -422,15 +513,14 @@ rmdbx_set_subdb( int argc, VALUE *argv, VALUE self )
 
 
 /*
- * call-seq:
+ * Open an existing (or create a new) mdbx database at filesystem
+ * +path+.  In block form, the database is automatically closed.
+ *
  *    MDBX::Database.open( path ) -> db
  *    MDBX::Database.open( path, options ) -> db
  *    MDBX::Database.open( path, options ) do |db|
  *    		db...
- *    end
- *
- * Open an existing (or create a new) mdbx database at filesystem
- * +path+.  In block form, the database is automatically closed.
+ *    end 
  *
  */
 VALUE
@@ -458,7 +548,8 @@ rmdbx_database_initialize( int argc, VALUE *argv, VALUE self )
 	db->cursor = NULL;
 	db->path   = StringValueCStr( path );
 	db->subdb  = NULL;
-	db->state.open = 0;
+	db->state.open       = 0;
+	db->state.retain_txn = -1;
 	db->settings.env_flags       = MDBX_ENV_DEFAULTS;
 	db->settings.mode            = 0644;
 	db->settings.max_collections = 0;
@@ -530,10 +621,15 @@ rmdbx_init_database()
 	rb_define_method( rmdbx_cDatabase, "close", rmdbx_close, 0 );
 	rb_define_method( rmdbx_cDatabase, "reopen", rmdbx_open_env, 0 );
 	rb_define_method( rmdbx_cDatabase, "closed?", rmdbx_closed_p, 0 );
+	rb_define_method( rmdbx_cDatabase, "in_transaction?", rmdbx_in_transaction_p, 0 );
 	rb_define_method( rmdbx_cDatabase, "clear", rmdbx_clear, 0 );
 	rb_define_method( rmdbx_cDatabase, "keys", rmdbx_keys, 0 );
 	rb_define_method( rmdbx_cDatabase, "[]", rmdbx_get_val, 1 );
 	rb_define_method( rmdbx_cDatabase, "[]=", rmdbx_put_val, 2 );
+
+	/* Manually open/close transactions from ruby. */
+	rb_define_protected_method( rmdbx_cDatabase, "open_transaction",  rmdbx_rb_opentxn, 1 );
+	rb_define_protected_method( rmdbx_cDatabase, "close_transaction", rmdbx_rb_closetxn, 1 );
 
 	rb_define_protected_method( rmdbx_cDatabase, "raw_stats", rmdbx_stats, 0 );
 
