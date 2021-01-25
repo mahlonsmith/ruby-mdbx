@@ -84,7 +84,7 @@ rmdbx_gather_environment_stats(
 			INT2NUM(menvinfo.mi_recent_txnid) );
 	rb_hash_aset( environ, ID2SYM(rb_intern("last_reader_txnid")),
 			INT2NUM(menvinfo.mi_latter_reader_txnid) );
-	rb_hash_aset( environ, ID2SYM(rb_intern("maximum_readers")),
+	rb_hash_aset( environ, ID2SYM(rb_intern("max_readers")),
 			INT2NUM(menvinfo.mi_maxreaders) );
 	rb_hash_aset( environ, ID2SYM(rb_intern("readers_in_use")),
 			INT2NUM(menvinfo.mi_numreaders) );
@@ -183,8 +183,7 @@ rmdbx_gather_stats( rmdbx_db_t *db )
 	rmdbx_gather_environment_stats( stat, mstat, menvinfo );
 	rmdbx_gather_reader_stats( db, stat, mstat, menvinfo );
 
-	/* database and subdatabases */
-
+	/* TODO: database and subdatabase stats */
 
 	return stat;
 }

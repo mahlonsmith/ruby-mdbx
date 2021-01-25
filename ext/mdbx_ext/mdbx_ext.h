@@ -31,6 +31,7 @@ struct rmdbx_db {
 
     struct {
        int open;
+       int retain_txn;
     } state;
 
 	char *path;

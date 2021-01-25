@@ -18,8 +18,6 @@ class MDBX::Database
 	###        db[ 'key' ] #=> value
 	###    end
 	###
-	### FIXME: document all options!
-	###
 	def self::open( *args, &block )
 		db = new( *args )
 
@@ -49,9 +47,11 @@ class MDBX::Database
 	attr_reader :path
 
 	# A Proc for automatically serializing values.
+	# Defaults to +Marshal.dump+.
 	attr_accessor :serializer
 
 	# A Proc for automatically deserializing values.
+	# Defaults to +Marshal.load+.
 	attr_accessor :deserializer
 
 
@@ -63,6 +63,56 @@ class MDBX::Database
 
 	# Allow for some common nomenclature.
 	alias_method :namespace, :collection
+
+
+	### Open a new mdbx read/write transaction.  In block form,
+	### the transaction is automatically committed.
+	###
+	### Raising a MDBX::Rollback exception from within the block
+	### automatically rolls the transaction back.
+	###
+	def transaction( commit: true, &block )
+		self.open_transaction( commit )
+		yield self if block_given?
+
+		return self
+
+	rescue MDBX::Rollback
+		commit = false
+		self.rollback
+	rescue
+		commit = false
+		self.rollback
+		raise
+	ensure
+		if block_given?
+			commit ? self.commit : self.rollback
+		end
+	end
+
+
+	### Open a new mdbx read only snapshot.  In block form,
+	### the snapshot is automatically closed.
+	###
+	def snapshot( &block )
+		self.transaction( commit: false, &block )
+	end
+
+
+	### Close any open transactions, abandoning all changes.
+	###
+	def rollback
+		return self.close_transaction( false )
+	end
+	alias_method :abort, :rollback
+
+
+	### Close any open transactions, writing all changes.
+	###
+	def commit
+		return self.close_transaction( true )
+	end
+	alias_method :save, :commit
 
 
 	### Return a hash of various metadata for the current database.
