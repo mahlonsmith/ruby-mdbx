@@ -9,5 +9,6 @@ group( :development ) do
 	gem 'rspec',                   '~> 3.9'
 	gem 'rubocop',                 '~> 0.93'
 	gem 'simplecov',               '~> 0.12'
+	gem 'simplecov-console',       '~> 0.9'
 end
 

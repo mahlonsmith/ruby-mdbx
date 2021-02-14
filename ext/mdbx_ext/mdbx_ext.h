@@ -4,8 +4,8 @@
 
 #include "mdbx.h"
 
-#ifndef MDBX_EXT_0_9_2
-#define MDBX_EXT_0_9_2
+#ifndef MDBX_EXT_0_9_3
+#define MDBX_EXT_0_9_3
 
 #define RMDBX_TXN_ROLLBACK 0
 #define RMDBX_TXN_COMMIT 1
@@ -63,5 +63,5 @@ extern void rmdbx_close_txn( rmdbx_db_t*, int );
 extern VALUE rmdbx_gather_stats( rmdbx_db_t* );
 
 
-#endif /* define MDBX_EXT_0_9_2 */
+#endif /* define MDBX_EXT_0_9_3 */
 

@@ -69,7 +69,7 @@ rmdbx_free( void *db )
 {
 	if ( db ) {
 		rmdbx_close_all( db );
-		free( db );
+		xfree( db );
 	}
 }
 
@@ -88,7 +88,7 @@ rmdbx_close( VALUE self )
 
 /*
  * call-seq:
- *    db.closed? #=> false
+ *    db.closed? => false
  *
  * Predicate: return true if the database environment is closed.
  */
@@ -102,7 +102,7 @@ rmdbx_closed_p( VALUE self )
 
 /*
  * call-seq:
- *    db.in_transaction? #=> false
+ *    db.in_transaction? => false
  *
  * Predicate: return true if a transaction (or snapshot)
  * is currently open.
@@ -117,6 +117,7 @@ rmdbx_in_transaction_p( VALUE self )
 
 /*
  * Open the DB environment handle.
+ *
  */
 VALUE
 rmdbx_open_env( VALUE self )
@@ -139,7 +140,7 @@ rmdbx_open_env( VALUE self )
 		mdbx_env_set_maxreaders( db->env, db->settings.max_readers );
 
 	/* Set an upper boundary (in bytes) for the database map size. */
-	if ( db->settings.max_size > -1 )
+	if ( db->settings.max_size )
 		mdbx_env_set_geometry( db->env, -1, -1, db->settings.max_size, -1, -1, -1 );
 
 	rc = mdbx_env_open( db->env, db->path, db->settings.env_flags, db->settings.mode );
@@ -251,7 +252,9 @@ rmdbx_rb_closetxn( VALUE self, VALUE write )
  * call-seq:
  *    db.clear
  *
- * Empty the database (or collection) on disk.  Unrecoverable!
+ * Empty the current collection on disk.  If collections are not enabled
+ * or the database handle is set to the top-level (main) db - this
+ * deletes *all data* on disk.  Fair warning, this is not recoverable!
  */
 VALUE
 rmdbx_clear( VALUE self )
@@ -313,7 +316,7 @@ rmdbx_val_for( VALUE self, VALUE arg )
 
 
 /* call-seq:
- *    db.keys #=> [ 'key1', 'key2', ... ]
+ *    db.keys => [ 'key1', 'key2', ... ]
  *
  * Return an array of all keys in the current collection.
  */
@@ -351,7 +354,7 @@ rmdbx_keys( VALUE self )
 
 
 /* call-seq:
- *    db[ 'key' ]  #=> value
+ *    db[ 'key' ] => value
  *
  * Convenience method:  return a single value for +key+ immediately.
  */
@@ -390,7 +393,7 @@ rmdbx_get_val( VALUE self, VALUE key )
 
 
 /* call-seq:
- *    db[ 'key' ] = value #=> value
+ *    db[ 'key' ] = value
  *
  * Convenience method:  set a single value for +key+
  */
@@ -432,7 +435,7 @@ rmdbx_put_val( VALUE self, VALUE key, VALUE val )
 
 /*
  * call-seq:
- *    db.statistics #=> (hash of stats)
+ *    db.statistics => (hash of stats)
  *
  * Returns a hash populated with various metadata for the opened
  * database.
@@ -449,17 +452,19 @@ rmdbx_stats( VALUE self )
 
 
 /*
- * Gets or sets the sub-database "collection" that read/write operations apply to.
+ * call-seq:
+ *    db.collection( 'collection_name' ) => db
+ *    db.collection( nil ) => db (main)
+ *
+ * Gets or sets the sub-database "collection" that read/write
+ * operations apply to.
  * Passing +nil+ sets the database to the main, top-level namespace.
  * If a block is passed, the collection automatically reverts to the
  * prior collection when it exits.
  *
- *    db.collection( 'collection_name' ) # => db
- *    db.collection( nil ) # => db (main)
- *
  *    db.collection( 'collection_name' ) do
  *        [ ... ]
- *    end #=> reverts to the previous collection name
+ *    end => reverts to the previous collection name
  *
  */
 VALUE
@@ -475,8 +480,13 @@ rmdbx_set_subdb( int argc, VALUE *argv, VALUE self )
 		return rb_str_new_cstr( db->subdb );
 	}
 
+	/* Provide a friendlier error message if max_collections is 0. */
+	if ( db->settings.max_collections == 0 )
+			rb_raise( rmdbx_eDatabaseError, "Unable to change collection: collections are not enabled." );
+
 	/* All transactions must be closed when switching database handles. */
-	if ( db->txn ) rb_raise( rmdbx_eDatabaseError, "Unable to change collection: finish current transaction" );
+	if ( db->txn )
+		rb_raise( rmdbx_eDatabaseError, "Unable to change collection: transaction open" );
 
 	/* Retain the prior database collection if a
 	 * block was passed. */
@@ -505,7 +515,7 @@ rmdbx_set_subdb( int argc, VALUE *argv, VALUE self )
 			db->subdb = prev_db;
 			rmdbx_close_dbi( db );
 		}
-		free( prev_db );
+		xfree( prev_db );
 	}
 
 	return self;
@@ -554,7 +564,7 @@ rmdbx_database_initialize( int argc, VALUE *argv, VALUE self )
 	db->settings.mode            = 0644;
 	db->settings.max_collections = 0;
 	db->settings.max_readers     = 0;
-	db->settings.max_size        = -1;
+	db->settings.max_size        = 0;
 
 	/* Options setup, overrides.
 	 */
