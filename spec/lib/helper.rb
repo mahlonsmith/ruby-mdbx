@@ -5,7 +5,18 @@
 
 if ENV[ 'COVERAGE' ]
 	require 'simplecov'
-	SimpleCov.start
+	require 'simplecov-console'
+	SimpleCov.formatter = SimpleCov::Formatter::MultiFormatter.new([
+		SimpleCov::Formatter::HTMLFormatter,
+		SimpleCov::Formatter::Console,
+	])
+	SimpleCov.start do
+		add_filter 'spec'
+		# enable_coverage :branch
+		add_group "Needing tests" do |file|
+			file.covered_percent < 90
+		end
+	end
 end
 
 require 'pathname'
