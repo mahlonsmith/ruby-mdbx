@@ -11,6 +11,6 @@ rescue Exception => e
 		e.backtrace.join( "\n\t" )
 end
 
-# db = MDBX::Database.open( 'tmp/testdb' )
+db = MDBX::Database.open( 'tmp/testdb', max_collections: 100 )
 
 

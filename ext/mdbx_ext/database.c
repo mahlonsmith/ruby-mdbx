@@ -75,7 +75,7 @@ rmdbx_free( void *db )
 
 
 /*
- * Cleanly close an opened database from Ruby.
+ * Cleanly close an opened database.
  */
 VALUE
 rmdbx_close( VALUE self )
@@ -155,6 +155,25 @@ rmdbx_open_env( VALUE self )
 
 
 /*
+ * Open a cursor for iteration.
+ */
+void
+rmdbx_open_cursor( rmdbx_db_t *db )
+{
+	if ( ! db->state.open ) rb_raise( rmdbx_eDatabaseError, "Closed database." );
+	if ( ! db->txn ) rb_raise( rmdbx_eDatabaseError, "No snapshot or transaction currently open." );
+
+	int rc = mdbx_cursor_open( db->txn, db->dbi, &db->cursor );
+	if ( rc != MDBX_SUCCESS ) {
+		rmdbx_close_all( db );
+		rb_raise( rmdbx_eDatabaseError, "Unable to open cursor: (%d) %s", rc, mdbx_strerror(rc) );
+	}
+
+	return;
+}
+
+
+/*
  * Open a new database transaction.  If a transaction is already
  * open, this is a no-op.
  *
@@ -165,7 +184,7 @@ rmdbx_open_txn( rmdbx_db_t *db, int rwflag )
 {
 	if ( db->txn ) return;
 
-	int rc = mdbx_txn_begin( db->env, NULL, rwflag, &db->txn);
+	int rc = mdbx_txn_begin( db->env, NULL, rwflag, &db->txn );
 	if ( rc != MDBX_SUCCESS ) {
 		rmdbx_close_all( db );
 		rb_raise( rmdbx_eDatabaseError, "mdbx_txn_begin: (%d) %s", rc, mdbx_strerror(rc) );
@@ -254,7 +273,7 @@ rmdbx_rb_closetxn( VALUE self, VALUE write )
  *
  * Empty the current collection on disk.  If collections are not enabled
  * or the database handle is set to the top-level (main) db - this
- * deletes *all data* on disk.  Fair warning, this is not recoverable!
+ * deletes *all records* from the database.  This is not recoverable!
  */
 VALUE
 rmdbx_clear( VALUE self )
@@ -315,40 +334,133 @@ rmdbx_val_for( VALUE self, VALUE arg )
 }
 
 
-/* call-seq:
- *    db.keys => [ 'key1', 'key2', ... ]
- *
- * Return an array of all keys in the current collection.
+/*
+ * Deserialize and return a value.
  */
 VALUE
-rmdbx_keys( VALUE self )
+rmdbx_deserialize( VALUE self, VALUE val )
+{
+	VALUE deserialize_proc = rb_iv_get( self, "@deserializer" );
+	if ( ! NIL_P( deserialize_proc ) )
+		val = rb_funcall( deserialize_proc, rb_intern("call"), 1, val );
+
+	return val;
+}
+
+
+/* call-seq:
+ *    db.each_key {|key| block } => self
+ *
+ * Calls the block once for each key, returning self.
+ * A transaction must be opened prior to use.
+ */
+VALUE
+rmdbx_each_key( VALUE self )
 {
 	UNWRAP_DB( self, db );
-	VALUE rv = rb_ary_new();
 	MDBX_val key, data;
-	int rc;
 
-	if ( ! db->state.open ) rb_raise( rmdbx_eDatabaseError, "Closed database." );
+	rmdbx_open_cursor( db );
+	RETURN_ENUMERATOR( self, 0, 0 );
 
-	rmdbx_open_txn( db, MDBX_TXN_RDONLY );
-	rc = mdbx_cursor_open( db->txn, db->dbi, &db->cursor);
-
-	if ( rc != MDBX_SUCCESS ) {
-		rmdbx_close( self );
-		rb_raise( rmdbx_eDatabaseError, "Unable to open cursor: (%d) %s", rc, mdbx_strerror(rc) );
-	}
-
-	rc = mdbx_cursor_get( db->cursor, &key, &data, MDBX_FIRST );
-	if ( rc == MDBX_SUCCESS ) {
-		rb_ary_push( rv, rb_str_new( key.iov_base, key.iov_len ) );
-		while ( mdbx_cursor_get( db->cursor, &key, &data, MDBX_NEXT ) == 0 ) {
-			rb_ary_push( rv, rb_str_new( key.iov_base, key.iov_len ) );
+	if ( mdbx_cursor_get( db->cursor, &key, &data, MDBX_FIRST ) == MDBX_SUCCESS ) {
+		rb_yield( rb_str_new( key.iov_base, key.iov_len ) );
+		while ( mdbx_cursor_get( db->cursor, &key, &data, MDBX_NEXT ) == MDBX_SUCCESS ) {
+			rb_yield( rb_str_new( key.iov_base, key.iov_len ) );
 		}
 	}
 
 	mdbx_cursor_close( db->cursor );
 	db->cursor = NULL;
+	return self;
+}
+
+
+/* call-seq:
+ *    db.each_value {|value| block } => self
+ *
+ * Calls the block once for each value, returning self.
+ * A transaction must be opened prior to use.
+ */
+VALUE
+rmdbx_each_value( VALUE self )
+{
+	UNWRAP_DB( self, db );
+	MDBX_val key, data;
+
+	rmdbx_open_cursor( db );
+	RETURN_ENUMERATOR( self, 0, 0 );
+
+	if ( mdbx_cursor_get( db->cursor, &key, &data, MDBX_FIRST ) == MDBX_SUCCESS ) {
+		VALUE rv = rb_str_new( data.iov_base, data.iov_len );
+		rb_yield( rmdbx_deserialize( self, rv ) );
+
+		while ( mdbx_cursor_get( db->cursor, &key, &data, MDBX_NEXT ) == MDBX_SUCCESS ) {
+			rv = rb_str_new( data.iov_base, data.iov_len );
+			rb_yield( rmdbx_deserialize( self, rv ) );
+		}
+	}
+
+	mdbx_cursor_close( db->cursor );
+	db->cursor = NULL;
+	return self;
+}
+
+
+/* call-seq:
+ *    db.each_pair {|key, value| block } => self
+ *
+ * Calls the block once for each key and value, returning self.
+ * A transaction must be opened prior to use.
+ */
+VALUE
+rmdbx_each_pair( VALUE self )
+{
+	UNWRAP_DB( self, db );
+	MDBX_val key, data;
+
+	rmdbx_open_cursor( db );
+	RETURN_ENUMERATOR( self, 0, 0 );
+
+	if ( mdbx_cursor_get( db->cursor, &key, &data, MDBX_FIRST ) == MDBX_SUCCESS ) {
+		VALUE rkey = rb_str_new( key.iov_base, key.iov_len );
+		VALUE rval = rb_str_new( data.iov_base, data.iov_len );
+		rb_yield( rb_assoc_new( rkey, rmdbx_deserialize( self, rval ) ) );
+
+		while ( mdbx_cursor_get( db->cursor, &key, &data, MDBX_NEXT ) == MDBX_SUCCESS ) {
+			rkey = rb_str_new( key.iov_base, key.iov_len );
+			rval = rb_str_new( data.iov_base, data.iov_len );
+			rb_yield( rb_assoc_new( rkey, rmdbx_deserialize( self, rval ) ) );
+		}
+	}
+
+	mdbx_cursor_close( db->cursor );
+	db->cursor = NULL;
+	return self;
+}
+
+
+/* call-seq:
+ *    db.length -> Integer
+ *
+ * Returns the count of keys in the currently selected collection.
+ */
+VALUE
+rmdbx_length( VALUE self )
+{
+	UNWRAP_DB( self, db );
+	MDBX_stat mstat;
+
+	if ( ! db->state.open ) rb_raise( rmdbx_eDatabaseError, "Closed database." );
+	rmdbx_open_txn( db, MDBX_TXN_RDONLY );
+
+	int rc = mdbx_dbi_stat( db->txn, db->dbi, &mstat, sizeof(mstat) );
+	if ( rc != MDBX_SUCCESS )
+		rb_raise( rmdbx_eDatabaseError, "mdbx_dbi_stat: (%d) %s", rc, mdbx_strerror(rc) );
+
+	VALUE rv = LONG2FIX( mstat.ms_entries );
 	rmdbx_close_txn( db, RMDBX_TXN_ROLLBACK );
+
 	return rv;
 }
 
@@ -356,31 +468,27 @@ rmdbx_keys( VALUE self )
 /* call-seq:
  *    db[ 'key' ] => value
  *
- * Convenience method:  return a single value for +key+ immediately.
+ * Return a single value for +key+ immediately.
  */
 VALUE
 rmdbx_get_val( VALUE self, VALUE key )
 {
 	int rc;
-	VALUE deserialize_proc;
 	UNWRAP_DB( self, db );
 
 	if ( ! db->state.open ) rb_raise( rmdbx_eDatabaseError, "Closed database." );
-
 	rmdbx_open_txn( db, MDBX_TXN_RDONLY );
 
 	MDBX_val ckey = rmdbx_key_for( key );
 	MDBX_val data;
+	VALUE rv;
 	rc = mdbx_get( db->txn, db->dbi, &ckey, &data );
 	rmdbx_close_txn( db, RMDBX_TXN_ROLLBACK );
 
 	switch ( rc ) {
 		case MDBX_SUCCESS:
-			deserialize_proc = rb_iv_get( self, "@deserializer" );
-			VALUE rv = rb_str_new( data.iov_base, data.iov_len );
-			if ( ! NIL_P( deserialize_proc ) )
-				return rb_funcall( deserialize_proc, rb_intern("call"), 1, rv );
-			return rv;
+			rv = rb_str_new( data.iov_base, data.iov_len );
+			return rmdbx_deserialize( self, rv );
 
 		case MDBX_NOTFOUND:
 			return Qnil;
@@ -395,7 +503,7 @@ rmdbx_get_val( VALUE self, VALUE key )
 /* call-seq:
  *    db[ 'key' ] = value
  *
- * Convenience method:  set a single value for +key+
+ * Set a single value for +key+.
  */
 VALUE
 rmdbx_put_val( VALUE self, VALUE key, VALUE val )
@@ -404,7 +512,6 @@ rmdbx_put_val( VALUE self, VALUE key, VALUE val )
 	UNWRAP_DB( self, db );
 
 	if ( ! db->state.open ) rb_raise( rmdbx_eDatabaseError, "Closed database." );
-
 	rmdbx_open_txn( db, MDBX_TXN_READWRITE );
 
 	MDBX_val ckey = rmdbx_key_for( key );
@@ -453,8 +560,9 @@ rmdbx_stats( VALUE self )
 
 /*
  * call-seq:
- *    db.collection( 'collection_name' ) => db
- *    db.collection( nil ) => db (main)
+ *    db.collection -> (collection name, or nil if in main)
+ *    db.collection( 'collection_name' ) -> db
+ *    db.collection( nil ) -> db (main)
  *
  * Gets or sets the sub-database "collection" that read/write
  * operations apply to.
@@ -464,7 +572,7 @@ rmdbx_stats( VALUE self )
  *
  *    db.collection( 'collection_name' ) do
  *        [ ... ]
- *    end => reverts to the previous collection name
+ *    end # reverts to the previous collection name
  *
  */
 VALUE
@@ -482,22 +590,19 @@ rmdbx_set_subdb( int argc, VALUE *argv, VALUE self )
 
 	/* Provide a friendlier error message if max_collections is 0. */
 	if ( db->settings.max_collections == 0 )
-			rb_raise( rmdbx_eDatabaseError, "Unable to change collection: collections are not enabled." );
+		rb_raise( rmdbx_eDatabaseError, "Unable to change collection: collections are not enabled." );
 
 	/* All transactions must be closed when switching database handles. */
 	if ( db->txn )
 		rb_raise( rmdbx_eDatabaseError, "Unable to change collection: transaction open" );
 
-	/* Retain the prior database collection if a
-	 * block was passed. */
-	if ( rb_block_given_p() ) {
-		if ( db->subdb != NULL ) {
-			prev_db = (char *) malloc( strlen(db->subdb) + 1 );
-			strcpy( prev_db, db->subdb );
-		}
+	/* Retain the prior database collection if a block was passed.
+	 */
+	if ( rb_block_given_p() && db->subdb != NULL ) {
+		prev_db = (char *) malloc( strlen(db->subdb) + 1 );
+		strcpy( prev_db, db->subdb );
 	}
 
-	rb_iv_set( self, "@collection", subdb );
 	db->subdb = NIL_P( subdb ) ? NULL : StringValueCStr( subdb );
 	rmdbx_close_dbi( db );
 
@@ -507,11 +612,11 @@ rmdbx_set_subdb( int argc, VALUE *argv, VALUE self )
 	  haven't written anything to the new collection yet.
 	 */
 
-	/* Revert to the previous collection after the block is done. */
+	/* Revert to the previous collection after the block is done.
+	 */
 	if ( rb_block_given_p() ) {
 		rb_yield( self );
 		if ( db->subdb != prev_db ) {
-			rb_iv_set( self, "@collection", prev_db ? rb_str_new_cstr(prev_db) : Qnil );
 			db->subdb = prev_db;
 			rmdbx_close_dbi( db );
 		}
@@ -633,7 +738,10 @@ rmdbx_init_database()
 	rb_define_method( rmdbx_cDatabase, "closed?", rmdbx_closed_p, 0 );
 	rb_define_method( rmdbx_cDatabase, "in_transaction?", rmdbx_in_transaction_p, 0 );
 	rb_define_method( rmdbx_cDatabase, "clear", rmdbx_clear, 0 );
-	rb_define_method( rmdbx_cDatabase, "keys", rmdbx_keys, 0 );
+	rb_define_method( rmdbx_cDatabase, "each_key", rmdbx_each_key, 0 );
+	rb_define_method( rmdbx_cDatabase, "each_value", rmdbx_each_value, 0 );
+	rb_define_method( rmdbx_cDatabase, "each_pair", rmdbx_each_pair, 0 );
+	rb_define_method( rmdbx_cDatabase, "length", rmdbx_length, 0 );
 	rb_define_method( rmdbx_cDatabase, "[]", rmdbx_get_val, 1 );
 	rb_define_method( rmdbx_cDatabase, "[]=", rmdbx_put_val, 2 );
 
