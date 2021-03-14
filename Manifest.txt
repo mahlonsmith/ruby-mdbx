@@ -4,6 +4,7 @@ ext/mdbx_ext/extconf.rb
 ext/mdbx_ext/mdbx_ext.c
 ext/mdbx_ext/mdbx_ext.h
 ext/mdbx_ext/database.c
+ext/mdbx_ext/stats.c
 lib/mdbx.rb
-lib/mdbx_ext.so
 lib/mdbx/database.rb
+

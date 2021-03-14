@@ -117,7 +117,7 @@ reader_list_callback(
 	rb_hash_aset( reader, ID2SYM(rb_intern("slot")),
 			INT2NUM( slot ) );
 	rb_hash_aset( reader, ID2SYM(rb_intern("pid")),
-		   	LONG2FIX( pid ) );
+			LONG2FIX( pid ) );
 	rb_hash_aset( reader, ID2SYM(rb_intern("thread")),
 			LONG2FIX( thread ) );
 	rb_hash_aset( reader, ID2SYM(rb_intern("txnid")),
