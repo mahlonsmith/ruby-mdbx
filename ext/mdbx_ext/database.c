@@ -634,8 +634,8 @@ rmdbx_set_subdb( int argc, VALUE *argv, VALUE self )
  *    MDBX::Database.open( path ) -> db
  *    MDBX::Database.open( path, options ) -> db
  *    MDBX::Database.open( path, options ) do |db|
- *    		db...
- *    end 
+ *        db...
+ *    end
  *
  */
 VALUE

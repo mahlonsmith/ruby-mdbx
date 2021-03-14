@@ -10,7 +10,7 @@ require 'mdbx_ext'
 module MDBX
 
 	# The version of this gem.
-	VERSION = '0.0.1'
+	VERSION = '0.1.0'
 
 end # module MDBX
 
