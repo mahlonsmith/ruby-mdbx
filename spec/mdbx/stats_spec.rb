@@ -28,30 +28,14 @@ RSpec.describe( MDBX::Database ) do
 		expect( build[:options] ).to be_a( Hash )
 	end
 
+	it "returns readers in use" do
+		readers = stats[ :readers ]
+		expect( stats.dig(:environment, :readers_in_use) ).to eq( readers.size )
+		expect( readers.first[:pid] ).to eq( $$ )
+	end
+
+	it "returns datafile attributes" do
+		expect( stats.dig(:environment, :datafile, :type) ).to eq( "dynamic" )
+	end
 end
 
-
-__END__
-{:environment=>
-  {:pagesize=>4096,
-     :last_txnid=>125,
-     :last_reader_txnid=>125,
-     :maximum_readers=>122,
-     :readers_in_use=>1,
-     :datafile=>
-      {:size_current=>65536,
-	       :pages=>16,
-	       :type=>"dynamic",
-	       :size_lower=>12288,
-	       :size_upper=>1048576,
-	       :growth_step=>65536,
-	       :shrink_threshold=>131072}},
- :readers=>
-  [{:slot=>0,
-      :pid=>45436,
-      :thread=>34374651904,
-      :txnid=>0,
-      :lag=>0,
-      :bytes_used=>0,
-      :bytes_retired=>0}]}
-}

@@ -59,8 +59,23 @@ RSpec.describe( MDBX::Database ) do
 			}.
 			to raise_exception( MDBX::DatabaseError, /environment is already used/ )
 		end
+	end
 
-		it "can remove a key by setting its value to nil" do
+
+	context 'hash-alike methods' do
+
+		let!( :db ) { described_class.open( TEST_DATABASE.to_s ) }
+
+		before( :each ) do
+			db.clear
+		end
+
+		after( :each ) do
+			db.close
+		end
+
+
+		it "can remove an entry by setting a key's value to nil" do
 			db[ 'test' ] = "hi"
 			expect( db['test'] ).to eq( 'hi' )
 
@@ -68,11 +83,74 @@ RSpec.describe( MDBX::Database ) do
 			expect( db['test'] ).to be_nil
 		end
 
+		it 'can remove an entry via delete()' do
+			val = 'hi'
+			db[ 'test' ] = val
+			expect( db['test'] ).to eq( val )
+
+			oldval = db.delete( 'test' )
+			expect( oldval ).to eq( val )
+			expect( db['test'] ).to be_nil
+		end
+
+		it 'returns a the delete() block if a key is not found' do
+			db.clear
+			expect( db.delete( 'test' ) ).to be_nil
+			rv = db.delete( 'test' ) {|key| "Couldn't find %p key!" % [ key ] }
+			expect( rv ).to eq( "Couldn't find \"test\" key!" )
+		end
+
 		it "can return an array of its keys" do
 			db[ 'key1' ] = true
 			db[ 'key2' ] = true
 			db[ 'key3' ] = true
 			expect( db.keys ).to include( 'key1', 'key2', 'key3' )
+		end
+
+		it 'knows when there is data present' do
+			expect( db.empty? ).to be_truthy
+			db[ 'bloop' ] = 1
+			expect( db.empty? ).to be_falsey
+		end
+
+		it "can convert to an array" do
+			3.times{|i| db[i] = i }
+			expect( db.to_a ).to eq([ ["0",0], ["1",1], ["2",2] ])
+		end
+
+		it "can convert to a hash" do
+			3.times{|i| db[i] = i }
+			expect( db.to_h ).to eq({ "0"=>0, "1"=>1, "2"=>2 })
+		end
+
+		it "retrieves a value via fetch()" do
+			db[ 'test' ] = true
+			expect( db.fetch('test') ).to be_truthy
+		end
+
+		it "executes a fetch() block if the key was not found" do
+			rv = false
+			db.fetch( 'nopenopenope' ) { rv = true }
+			expect( rv ).to be_truthy
+		end
+
+		it "raises KeyError if fetch()ing without a block to a nonexistent key" do
+			expect{ db.fetch(:nopenopenope) }.to raise_exception( KeyError, /key not found/ )
+		end
+
+		it "can return a sliced hash" do
+			( 'a'..'z' ).each{|c| db[c] = c }
+			expect( db.slice( 'a', 'f' ) ).to eq( 'a' => 'a', 'f' => 'f' )
+		end
+
+		it "can return an array of specific values" do
+			( 'a'..'z' ).each{|c| db[c] = c * 3 }
+			expect( db.values_at('e', 'nopenopenope', 'g') ).to eq( ['eee', nil, 'ggg'] )
+		end
+
+		it "can return an array of all values" do
+			( 'a'..'z' ).each{|c| db[c] = c * 2  }
+			expect( db.values ).to include( 'aa', 'hh', 'tt' )
 		end
 	end
 
@@ -91,6 +169,18 @@ RSpec.describe( MDBX::Database ) do
 			expect{
 				db.collection( 'bucket' )
 			} .to raise_exception( /not enabled/ )
+		end
+
+		it "knows it's length" do
+			db.collection( 'size1' )
+			10.times {|i| db[i] = true }
+			db.collection( 'size2' )
+			25.times {|i| db[i] = true }
+
+			db.collection( 'size1' )
+			expect( db.length ).to be( 10 )
+			db.collection( 'size2' )
+			expect( db.length ).to be( 25 )
 		end
 
 		it "disallows regular key/val storage for namespace keys" do
@@ -221,6 +311,93 @@ RSpec.describe( MDBX::Database ) do
 				db[ 1 ] = false
 			end
 			expect( db[ 1 ] ).to be_falsey
+		end
+	end
+
+
+	context "iterators" do
+
+		let( :db ) {
+			described_class.open( TEST_DATABASE.to_s, max_collections: 5 ).collection( 'iter' )
+		}
+
+		before( :each ) do
+			3.times {|i| db[i] = "#{i}-val" }
+		end
+
+		after( :each ) do
+			db.close
+		end
+
+		it "raises an exception if the caller didn't open a transaction first" do
+			expect{ db.each_key }.to raise_exception( MDBX::DatabaseError, /no .*currently open/i )
+			expect{ db.each_value }.to raise_exception( MDBX::DatabaseError, /no .*currently open/i )
+			expect{ db.each_pair }.to raise_exception( MDBX::DatabaseError, /no .*currently open/i )
+		end
+
+		context "(with a transaction)" do
+
+			before( :each ) { db.snapshot }
+			after( :each )  { db.abort }
+
+			it "returns an iterator without a block" do
+				iter = db.each_key
+				expect( iter ).to be_a( Enumerator )
+				expect( iter.to_a.size ).to be( 3 )
+			end
+
+			it "can iterate through keys" do
+				rv = db.each_key.with_object([]){|k, acc| acc << k }
+				expect( db.each_key.to_a ).to eq( rv )
+			end
+
+			it "can iterate through values" do
+				rv = db.each_value.with_object([]){|v, acc| acc << v }
+				expect( rv ).to eq( %w[ 0-val 1-val 2-val ] )
+			end
+
+			it "can iterate through key/value pairs" do
+				expect( db.each_pair.to_a.first ).to eq([ "0", "0-val" ])
+				expect( db.each_pair.to_a.last ).to eq([ "2", "2-val" ])
+			end
+		end
+	end
+
+
+	context "serialization" do
+
+		let( :db ) {
+			described_class.open( TEST_DATABASE.to_s )
+		}
+
+		after( :each ) do
+			db.close
+		end
+
+		it "uses Marshalling as default" do
+			db.deserializer = nil
+			hash = { a_hash: true }
+			db[ 'test' ] = hash
+			expect( db['test'] ).to eq( Marshal.dump( hash ) )
+		end
+
+		it "can be disabled completely" do
+			db.serializer = nil
+			db.deserializer = nil
+
+			db[ 'test' ] = "doot"
+			db[ 'test2' ] = [1,2,3].to_s
+			expect( db['test'] ).to eq( "doot" )
+			expect( db['test2'] ).to eq( "[1, 2, 3]" )
+		end
+
+		it "can be arbitrarily changed" do
+			db.serializer = ->( v ) { JSON.generate(v) }
+			db.deserializer = ->( v ) { JSON.parse(v) }
+
+			hash = { "a_hash" => true }
+			db[ 'test' ] = hash
+			expect( db['test'] ).to eq( hash )
 		end
 	end
 end

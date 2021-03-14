@@ -19,12 +19,15 @@ class MDBX::Database
 	###
 	###    MDBX::Database.open( path, options ) do |db|
 	###        db[ 'key' ] = value
-	###    end
+	###    end # closed!
 	###
 	### Passing options modify various database behaviors.  See the libmdbx
 	### documentation for detailed information.
 	###
 	### ==== Options
+	###
+	### Unless otherwise mentioned, option keys are symbols, and values
+	### are boolean.
 	###
 	### [:mode]
 	###   Whe creating a new database, set permissions to this 4 digit
@@ -50,11 +53,11 @@ class MDBX::Database
 	###   Reject any write attempts while using this database handle.
 	###
 	### [:exclusive]
-	###   Access is restricted to this process handle. Other attempts
+	###   Access is restricted to the first opening process. Other attempts
 	###   to use this database (even in readonly mode) are denied.
 	###
 	### [:compat]
-	###   Avoid incompatibility errors when opening an in-use database with
+	###   Skip compatibility checks when opening an in-use database with
 	###   unknown or mismatched flag values.
 	###
 	### [:writemap]
@@ -131,12 +134,17 @@ class MDBX::Database
 		return self.collection( nil )
 	end
 
-	# Allow for some common nomenclature.
 	alias_method :namespace, :collection
+	alias_method :size, :length
+	alias_method :each, :each_pair
 
+
+	#
+	# Transaction methods
+	#
 
 	### Open a new mdbx read/write transaction.  In block form,
-	### the transaction is automatically committed.
+	### the transaction is automatically committed when the block ends.
 	###
 	### Raising a MDBX::Rollback exception from within the block
 	### automatically rolls the transaction back.
@@ -162,14 +170,14 @@ class MDBX::Database
 
 
 	### Open a new mdbx read only snapshot.  In block form,
-	### the snapshot is automatically closed.
+	### the snapshot is automatically closed when the block ends.
 	###
 	def snapshot( &block )
 		self.transaction( commit: false, &block )
 	end
 
 
-	### Close any open transactions, abandoning all changes.
+	### Close any open transaction, abandoning all changes.
 	###
 	def rollback
 		return self.close_transaction( false )
@@ -177,13 +185,124 @@ class MDBX::Database
 	alias_method :abort, :rollback
 
 
-	### Close any open transactions, writing all changes.
+	### Close any open transaction, writing all changes.
 	###
 	def commit
 		return self.close_transaction( true )
 	end
 	alias_method :save, :commit
 
+
+	#
+	# Hash-alike methods
+	#
+
+	### Return the entirety of database contents as an Array of array
+	### pairs.
+	###
+	def to_a
+		self.snapshot do
+			return self.each_pair.to_a
+		end
+	end
+
+
+	### Return the entirety of database contents as a Hash.
+	###
+	def to_h
+		self.snapshot do
+			return self.each_pair.to_h
+		end
+	end
+
+
+	### Returns +true+ if the current collection has no data.
+	###
+	def empty?
+		return self.size.zero?
+	end
+
+
+	### Returns the value for the given key, if found.
+	### If key is not found and no block was given, returns nil.
+	### If key is not found and a block was given, yields key to the
+	### block and returns the block's return value.
+	###
+	def fetch( key, &block )
+		val = self[ key ]
+		if block_given?
+			return block.call( key ) if val.nil?
+		else
+			return val if val
+			raise KeyError, "key not found: %p" % [ key ]
+		end
+	end
+
+
+	### Deletes the entry for the given key and returns its associated
+	### value.  If no block is given and key is found, deletes the entry
+	### and returns the associated value.  If no block given and key is
+	### not found, returns nil.
+	###
+	### If a block is given and key is found, ignores the block, deletes
+	### the entry, and returns the associated value.  If a block is given
+	### and key is not found, calls the block and returns the block's
+	### return value.
+	###
+	def delete( key, &block )
+		val = self[ key ]
+		return block.call( key ) if block_given? && val.nil?
+
+		self[ key ] = nil
+		return val
+	end
+
+
+	### Returns a new Array containing all keys in the collection.
+	###
+	def keys
+		self.snapshot do
+			return self.each_key.to_a
+		end
+	end
+
+
+	### Returns a new Hash object containing the entries for the given
+	### keys.  Any given keys that are not found are ignored.
+	###
+	def slice( *keys )
+		self.snapshot do
+			return keys.each_with_object( {} ) do |key, acc|
+				val = self[ key ]
+				acc[ key ] = val if val
+			end
+		end
+	end
+
+
+	### Returns a new Array containing all values in the collection.
+	###
+	def values
+		self.snapshot do
+			return self.each_value.to_a
+		end
+	end
+
+
+	### Returns a new Array containing values for the given +keys+.
+	###
+	def values_at( *keys )
+		self.snapshot do
+			return keys.each_with_object( [] ) do |key, acc|
+				acc << self[ key ]
+			end
+		end
+	end
+
+
+	#
+	# Utility methods
+	#
 
 	### Return a hash of various metadata for the current database.
 	###

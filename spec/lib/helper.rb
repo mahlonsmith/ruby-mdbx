@@ -21,6 +21,7 @@ end
 
 require 'pathname'
 require 'rspec'
+require 'json'
 require 'mdbx'
 
 
