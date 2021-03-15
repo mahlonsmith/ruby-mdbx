@@ -7,4 +7,3 @@ ext/mdbx_ext/database.c
 ext/mdbx_ext/stats.c
 lib/mdbx.rb
 lib/mdbx/database.rb
-

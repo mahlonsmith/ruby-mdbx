@@ -312,6 +312,19 @@ RSpec.describe( MDBX::Database ) do
 			end
 			expect( db[ 1 ] ).to be_falsey
 		end
+
+		it "doesn't inadvertantly close transactions when using hash-alike methods" do
+			expect( db.in_transaction? ).to be_falsey
+			db.transaction
+			expect( db.in_transaction? ).to be_truthy
+			db.to_a
+			db.to_h
+			db.keys
+			db.slice( :woop )
+			db.values
+			db.values_at( :woop )
+			expect( db.in_transaction? ).to be_truthy
+		end
 	end
 
 

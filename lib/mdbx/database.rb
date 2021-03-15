@@ -201,18 +201,24 @@ class MDBX::Database
 	### pairs.
 	###
 	def to_a
-		self.snapshot do
-			return self.each_pair.to_a
-		end
+		in_txn = self.in_transaction?
+		self.snapshot unless in_txn
+
+		return self.each_pair.to_a
+	ensure
+		self.abort unless in_txn
 	end
 
 
 	### Return the entirety of database contents as a Hash.
 	###
 	def to_h
-		self.snapshot do
-			return self.each_pair.to_h
-		end
+		in_txn = self.in_transaction?
+		self.snapshot unless in_txn
+
+		return self.each_pair.to_h
+	ensure
+		self.abort unless in_txn
 	end
 
 
@@ -261,9 +267,12 @@ class MDBX::Database
 	### Returns a new Array containing all keys in the collection.
 	###
 	def keys
-		self.snapshot do
-			return self.each_key.to_a
-		end
+		in_txn = self.in_transaction?
+		self.snapshot unless in_txn
+
+		return self.each_key.to_a
+	ensure
+		self.abort unless in_txn
 	end
 
 
@@ -271,32 +280,41 @@ class MDBX::Database
 	### keys.  Any given keys that are not found are ignored.
 	###
 	def slice( *keys )
-		self.snapshot do
-			return keys.each_with_object( {} ) do |key, acc|
-				val = self[ key ]
-				acc[ key ] = val if val
-			end
+		in_txn = self.in_transaction?
+		self.snapshot unless in_txn
+
+		return keys.each_with_object( {} ) do |key, acc|
+			val = self[ key ]
+			acc[ key ] = val if val
 		end
+	ensure
+		self.abort unless in_txn
 	end
 
 
 	### Returns a new Array containing all values in the collection.
 	###
 	def values
-		self.snapshot do
-			return self.each_value.to_a
-		end
+		in_txn = self.in_transaction?
+		self.snapshot unless in_txn
+
+		return self.each_value.to_a
+	ensure
+		self.abort unless in_txn
 	end
 
 
 	### Returns a new Array containing values for the given +keys+.
 	###
 	def values_at( *keys )
-		self.snapshot do
-			return keys.each_with_object( [] ) do |key, acc|
-				acc << self[ key ]
-			end
+		in_txn = self.in_transaction?
+		self.snapshot unless in_txn
+
+		return keys.each_with_object( [] ) do |key, acc|
+			acc << self[ key ]
 		end
+	ensure
+		self.abort unless in_txn
 	end
 
 
