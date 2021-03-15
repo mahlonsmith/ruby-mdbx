@@ -148,7 +148,7 @@ rmdbx_gather_reader_stats(
 {
 	VALUE readers = rb_ary_new();
 
-    mdbx_reader_list( db->env, reader_list_callback, (void*)readers );
+	mdbx_reader_list( db->env, reader_list_callback, (void*)readers );
 	rb_hash_aset( stat, ID2SYM(rb_intern("readers")), readers );
 
 	return;

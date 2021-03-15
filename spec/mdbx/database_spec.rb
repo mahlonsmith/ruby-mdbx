@@ -324,6 +324,7 @@ RSpec.describe( MDBX::Database ) do
 			db.values
 			db.values_at( :woop )
 			expect( db.in_transaction? ).to be_truthy
+			db.abort
 		end
 	end
 

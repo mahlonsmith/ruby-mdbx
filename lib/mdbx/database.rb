@@ -201,24 +201,18 @@ class MDBX::Database
 	### pairs.
 	###
 	def to_a
-		in_txn = self.in_transaction?
-		self.snapshot unless in_txn
-
-		return self.each_pair.to_a
-	ensure
-		self.abort unless in_txn
+		return self.conditional_snapshot do
+			self.each_pair.to_a
+		end
 	end
 
 
 	### Return the entirety of database contents as a Hash.
 	###
 	def to_h
-		in_txn = self.in_transaction?
-		self.snapshot unless in_txn
-
-		return self.each_pair.to_h
-	ensure
-		self.abort unless in_txn
+		return self.conditional_snapshot do
+			self.each_pair.to_h
+		end
 	end
 
 
@@ -267,12 +261,9 @@ class MDBX::Database
 	### Returns a new Array containing all keys in the collection.
 	###
 	def keys
-		in_txn = self.in_transaction?
-		self.snapshot unless in_txn
-
-		return self.each_key.to_a
-	ensure
-		self.abort unless in_txn
+		return self.conditional_snapshot do
+			self.each_key.to_a
+		end
 	end
 
 
@@ -280,41 +271,32 @@ class MDBX::Database
 	### keys.  Any given keys that are not found are ignored.
 	###
 	def slice( *keys )
-		in_txn = self.in_transaction?
-		self.snapshot unless in_txn
-
-		return keys.each_with_object( {} ) do |key, acc|
-			val = self[ key ]
-			acc[ key ] = val if val
+		return self.conditional_snapshot do
+			keys.each_with_object( {} ) do |key, acc|
+				val = self[ key ]
+				acc[ key ] = val if val
+			end
 		end
-	ensure
-		self.abort unless in_txn
 	end
 
 
 	### Returns a new Array containing all values in the collection.
 	###
 	def values
-		in_txn = self.in_transaction?
-		self.snapshot unless in_txn
-
-		return self.each_value.to_a
-	ensure
-		self.abort unless in_txn
+		return self.conditional_snapshot do
+			self.each_value.to_a
+		end
 	end
 
 
 	### Returns a new Array containing values for the given +keys+.
 	###
 	def values_at( *keys )
-		in_txn = self.in_transaction?
-		self.snapshot unless in_txn
-
-		return keys.each_with_object( [] ) do |key, acc|
-			acc << self[ key ]
+		return self.conditional_snapshot do
+			keys.each_with_object( [] ) do |key, acc|
+				acc << self[ key ]
+			end
 		end
-	ensure
-		self.abort unless in_txn
 	end
 
 
@@ -345,6 +327,24 @@ class MDBX::Database
 		stats.merge!( raw )
 
 		return stats
+	end
+
+
+	#########
+	protected
+	#########
+
+	### Yield and return the block, opening a snapshot first if
+	### there isn't already a transaction in progress.  Closes
+	### the snapshot if this method opened it.
+	###
+	def conditional_snapshot
+		in_txn = self.in_transaction?
+		self.snapshot unless in_txn
+
+		return yield
+	ensure
+		self.abort unless in_txn
 	end
 
 end # class MDBX::Database
