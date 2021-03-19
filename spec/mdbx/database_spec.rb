@@ -31,6 +31,22 @@ RSpec.describe( MDBX::Database ) do
 		expect( db.closed? ).to be_truthy
 	end
 
+	it "can create a closed clone" do
+		db = described_class.open( TEST_DATABASE.to_s )
+		db[1] = "doopydoo"
+
+		clone = db.clone
+
+		expect( db.closed? ).to be_falsey
+		expect( clone.closed? ).to be_truthy
+		expect( db.path ).to eq( clone.path )
+		db.close
+
+		clone.reopen
+		expect( clone[1] ).to eq( "doopydoo" )
+		clone.close
+	end
+
 
 	context 'an opened database' do
 

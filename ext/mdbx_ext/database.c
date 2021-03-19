@@ -718,6 +718,34 @@ rmdbx_database_initialize( int argc, VALUE *argv, VALUE self )
 
 
 /*
+ * call-seq:
+ *    db.clone => [copy of db]
+ *
+ * Copy the object (clone/dup).  The returned copy is closed and needs
+ * to be reopened before use.  This function likely  has limited use,
+ * considering you can't open two handles within the same process.
+ */
+static VALUE rmdbx_init_copy( VALUE copy, VALUE orig )
+{
+	rmdbx_db_t *orig_db;
+	rmdbx_db_t *copy_db;
+
+	if ( copy == orig ) return copy;
+
+	TypedData_Get_Struct( orig, rmdbx_db_t, &rmdbx_db_data, orig_db );
+	TypedData_Get_Struct( copy, rmdbx_db_t, &rmdbx_db_data, copy_db );
+
+	/* Copy all fields from the original to the copy, and force-close
+	   the copy.
+	*/
+	MEMCPY( copy_db, orig_db, rmdbx_db_t, 1 );
+	rmdbx_close_all( copy_db );
+
+	return copy;
+}
+
+
+/*
  * Initialization for the MDBX::Database class.
  */
 void
@@ -732,6 +760,7 @@ rmdbx_init_database()
 	rb_define_alloc_func( rmdbx_cDatabase, rmdbx_alloc );
 
 	rb_define_protected_method( rmdbx_cDatabase, "initialize", rmdbx_database_initialize, -1 );
+	rb_define_protected_method( rmdbx_cDatabase, "initialize_copy", rmdbx_init_copy, 1 );
 	rb_define_method( rmdbx_cDatabase, "collection", rmdbx_set_subdb, -1 );
 	rb_define_method( rmdbx_cDatabase, "close", rmdbx_close, 0 );
 	rb_define_method( rmdbx_cDatabase, "reopen", rmdbx_open_env, 0 );
