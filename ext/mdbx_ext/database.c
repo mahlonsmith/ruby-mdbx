@@ -603,7 +603,13 @@ rmdbx_set_subdb( int argc, VALUE *argv, VALUE self )
 		strcpy( prev_db, db->subdb );
 	}
 
-	db->subdb = NIL_P( subdb ) ? NULL : StringValueCStr( subdb );
+	if ( NIL_P(subdb) ) {
+		db->subdb = NULL;
+	}
+	else {
+		subdb = rb_funcall( subdb, rb_intern("to_s"), 0 );
+		db->subdb = StringValueCStr( subdb );
+	}
 	rmdbx_close_dbi( db );
 
 	/*

@@ -224,6 +224,11 @@ RSpec.describe( MDBX::Database ) do
 			expect( db['key'] ).to be_truthy
 		end
 
+		it "automatically stringifies the collection argument" do
+			db.collection( :bucket )
+			expect( db.collection ).to eq( 'bucket' )
+		end
+
 		it "revert back to the previous collection when used in a block" do
 			expect( db.collection ).to be_nil
 			db.collection( 'bucket' ) { 'no-op' }
