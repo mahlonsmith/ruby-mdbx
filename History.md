@@ -1,6 +1,13 @@
 # Release History for MDBX
 
 ---
+## v0.2.1 [2021-04-06] Mahlon E. Smith <mahlon@martini.nu>
+
+Enhancement:
+
+- Automatically stringify any argument to the collection() method.
+
+
 ## v0.2.0 [2021-03-19] Mahlon E. Smith <mahlon@martini.nu>
 
 Enhancement:
