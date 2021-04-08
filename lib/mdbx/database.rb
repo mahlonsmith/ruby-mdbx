@@ -128,15 +128,42 @@ class MDBX::Database
 	attr_accessor :deserializer
 
 
+	alias_method :size, :length
+	alias_method :each, :each_pair
+	alias_method :has_key?, :include?
+
+
+	### Gets or sets the sub-database "collection" that read/write
+	### operations apply to. If a block is passed, the collection
+	### automatically reverts to the prior collection when it exits.
+	###
+	###  db.collection #=> (collection name, or nil if in main)
+	###  db.collection( 'collection_name' ) #=> db
+	###
+	###  db.collection( 'collection_name' ) do
+	###      [ ... ]
+	###  end # reverts to the previous collection name
+	###
+	def collection( name=nil )
+		current = self.get_subdb
+		return current unless name
+
+		self.set_subdb( name.to_s )
+		yield( self ) if block_given?
+
+		return self
+
+	ensure
+		self.set_subdb( current ) if name && block_given?
+	end
+	alias_method :namespace, :collection
+
+
 	### Switch to the top-level collection.
 	###
 	def main
-		return self.collection( nil )
+		return self.set_subdb( nil )
 	end
-
-	alias_method :namespace, :collection
-	alias_method :size, :length
-	alias_method :each, :each_pair
 
 
 	#

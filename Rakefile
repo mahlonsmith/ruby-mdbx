@@ -4,6 +4,7 @@
 require 'rake/deveiate'
 
 Rake::DevEiate.setup( 'mdbx' ) do |project|
+	project.publish_to = 'martini.nu:martini/www/docs/ruby-mdbx/'
 	project.summary = <<~END_SUM
 		A ruby binding to libmdbx, an improved version
 		of the Lightning Memory Mapped Database.

@@ -1,6 +1,29 @@
 # Release History for MDBX
 
 ---
+## v0.3.0 [2021-04-09] Mahlon E. Smith <mahlon@martini.nu>
+
+Enhancements:
+
+ - Alter the behavior of #clear, so it doesn't destroy collection
+   environments, but just empties them.
+
+ - Add #drop, which explictly -does- destroy a collection environment.
+
+ - Switching to a collection now automatically creates its environment.
+
+ - Add include? and has_key?, for presence checks without allocating
+   value memory or requiring deserialization.
+
+
+Bugfixes:
+
+ - Run all cursor methods through rb_protect, to ensure proper
+   cursor cleanup in the event of an exception mid iteration.
+
+ - Fix the block form of collections to support multiple scopes.
+
+
 ## v0.2.1 [2021-04-06] Mahlon E. Smith <mahlon@martini.nu>
 
 Enhancement:
