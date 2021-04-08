@@ -6,7 +6,7 @@ require_relative '../lib/helper'
 
 RSpec.describe( MDBX::Database ) do
 
-	after( :all ) do
+	before( :all ) do
 		db = described_class.open( TEST_DATABASE.to_s )
 		db.clear
 		db.close
@@ -52,6 +52,10 @@ RSpec.describe( MDBX::Database ) do
 
 		let!( :db ) { described_class.open( TEST_DATABASE.to_s ) }
 
+		before( :each ) do
+			db.clear
+		end
+
 		after( :each ) do
 			db.close
 		end
@@ -90,6 +94,12 @@ RSpec.describe( MDBX::Database ) do
 			db.close
 		end
 
+
+		it "can check for the presence of a key" do
+			expect( db.has_key?( 'key1' ) ).to be_falsey
+			db[ 'key1' ] = 1
+			expect( db.has_key?( 'key1' ) ).to be_truthy
+		end
 
 		it "can remove an entry by setting a key's value to nil" do
 			db[ 'test' ] = "hi"
@@ -175,6 +185,10 @@ RSpec.describe( MDBX::Database ) do
 
 		let!( :db ) { described_class.open( TEST_DATABASE.to_s, max_collections: 5 ) }
 
+		before( :each ) do
+			db.clear
+		end
+
 		after( :each ) do
 			db.close
 		end
@@ -185,6 +199,11 @@ RSpec.describe( MDBX::Database ) do
 			expect{
 				db.collection( 'bucket' )
 			} .to raise_exception( /not enabled/ )
+		end
+
+		it "can be used immediately when switched to" do
+			db.collection( :bucket )
+			expect{ db.length }.to_not raise_exception
 		end
 
 		it "knows it's length" do
@@ -202,7 +221,7 @@ RSpec.describe( MDBX::Database ) do
 		it "disallows regular key/val storage for namespace keys" do
 			db.collection( 'bucket' )
 			db[ 'okay' ] = 1
-			db.collection( nil )
+			db.main
 
 			expect{ db['bucket'] = 1  }.to raise_exception( /MDBX_INCOMPATIBLE/ )
 		end
@@ -233,6 +252,37 @@ RSpec.describe( MDBX::Database ) do
 			expect( db.collection ).to be_nil
 			db.collection( 'bucket' ) { 'no-op' }
 			expect( db.collection ).to be_nil
+
+			db.collection( 'another' )
+			db.collection( 'bucket' ) { 'no-op' }
+			expect( db.collection ).to eq( 'another' )
+		end
+
+		it "reverts back to previous collections within multiple blocks" do
+			expect( db.collection ).to be_nil
+			db.collection( 'bucket1' ) do
+				expect( db.collection ).to eq( 'bucket1' )
+				db.collection( 'bucket2' ) do
+					expect( db.collection ).to eq( 'bucket2' )
+					db.collection( 'bucket3' ) do
+						expect( db.collection ).to eq( 'bucket3' )
+					end
+					expect( db.collection ).to eq( 'bucket2' )
+				end
+				expect( db.collection ).to eq( 'bucket1' )
+			end
+			expect( db.collection ).to be_nil
+		end
+
+		it "reverts back to previous collection if the block raises an exception" do
+			expect( db.collection ).to be_nil
+			begin
+				db.collection( 'bucket1' ) do
+					db.collection( 'bucket2' ) { raise "ka-bloooey!" }
+				end
+			rescue
+			end
+			expect( db.collection ).to be_nil
 		end
 
 		it "can be cleared of contents" do
@@ -242,7 +292,48 @@ RSpec.describe( MDBX::Database ) do
 
 			db.clear
 			db.main
-			expect( db['bucket'] ).to be_nil
+			expect( db ).to include( 'bucket' )
+		end
+
+		it "fail if the max_collections option is not enabled when dropping" do
+			db.close
+			db = described_class.open( TEST_DATABASE.to_s )
+			expect{
+				db.drop( 'bucket' )
+			} .to raise_exception( /not enabled/ )
+		end
+
+		it "disallows dropping a collection mid transaction" do
+			expect {
+				db.transaction { db.drop(:bucket) }
+			}.to raise_exception( MDBX::DatabaseError, /transaction open/ )
+		end
+
+		it "disallows dropping a collection within a collection" do
+			expect {
+				db.collection(:bucket) { db.drop(:bucket) }
+			}.to raise_exception( MDBX::DatabaseError, /switch to top-level/ )
+		end
+
+		it "sets the current collection to 'main' after dropping a collection" do
+			db.collection( 'doom' )
+			db.main
+			db.drop( 'doom' )
+
+			expect( db.collection ).to be_nil
+			expect( db['doom'] ).to be_nil
+		end
+
+		it "retains the collection environment when clearing data" do
+			db.collection( 'doom' )
+			db[ 'key' ] = 1
+			db.clear
+
+			expect( db.collection ).to eq( 'doom' )
+			expect( db ).to_not have_key( 'key' )
+
+			db.main
+			expect( db ).to include( 'doom' )
 		end
 	end
 
@@ -250,6 +341,10 @@ RSpec.describe( MDBX::Database ) do
 	context 'transactions' do
 
 		let!( :db ) { described_class.open( TEST_DATABASE.to_s, max_collections: 5 ) }
+
+		before( :each ) do
+			db.clear
+		end
 
 		after( :each ) do
 			db.close

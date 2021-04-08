@@ -13,4 +13,3 @@ end
 
 db = MDBX::Database.open( 'tmp/testdb', max_collections: 100 )
 
-
