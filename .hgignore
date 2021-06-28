@@ -8,6 +8,7 @@ spec/\.status
 coverage/
 vendor/
 pkg/
+^tags$
 ^Session.vim$
 ^Makefile$
 

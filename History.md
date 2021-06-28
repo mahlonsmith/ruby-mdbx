@@ -1,6 +1,15 @@
 # Release History for MDBX
 
 ---
+## v0.3.1 [2021-05-16] Mahlon E. Smith <mahlon@martini.nu>
+
+Bugfix:
+
+ - #drop could potentially remove unintended data.  Yanked version
+   v0.3.0.
+
+
+---
 ## v0.3.0 [2021-04-09] Mahlon E. Smith <mahlon@martini.nu>
 
 Enhancements:

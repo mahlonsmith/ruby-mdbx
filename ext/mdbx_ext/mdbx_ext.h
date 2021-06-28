@@ -4,11 +4,22 @@
 
 #include "mdbx.h"
 
-#ifndef MDBX_EXT_0_9_3
-#define MDBX_EXT_0_9_3
+#ifndef RBMDBX_EXT
+#define RBMDBX_EXT
 
 #define RMDBX_TXN_ROLLBACK 0
 #define RMDBX_TXN_COMMIT 1
+
+/* Shortcut for fetching wrapped data structure.
+ */
+#define UNWRAP_DB( self, db ) \
+	rmdbx_db_t *db; \
+	TypedData_Get_Struct( self, rmdbx_db_t, &rmdbx_db_data, db )
+
+/* Raise if current DB is not open. */
+#define CHECK_HANDLE() \
+	if ( ! db->state.open ) rb_raise( rmdbx_eDatabaseError, "Closed database." )
+
 
 /*
  * A struct encapsulating an instance's DB
@@ -21,7 +32,8 @@ struct rmdbx_db {
 	MDBX_cursor *cursor;
 
     struct {
-       int env_flags;
+       unsigned int env_flags;
+       unsigned int db_flags;
        int mode;
        int open;
        int max_collections;
@@ -40,12 +52,11 @@ struct rmdbx_db {
 typedef struct rmdbx_db rmdbx_db_t;
 
 static const rb_data_type_t rmdbx_db_data;
-extern void rmdbx_free( void *db ); /* forward declaration for the allocator */
+
 
 /* ------------------------------------------------------------
  * Globals
  * ------------------------------------------------------------ */
-
 extern VALUE rmdbx_mMDBX;
 extern VALUE rmdbx_cDatabase;
 extern VALUE rmdbx_eDatabaseError;
@@ -55,13 +66,15 @@ extern VALUE rmdbx_eRollback;
 /* ------------------------------------------------------------
  * Functions
  * ------------------------------------------------------------ */
+extern void rmdbx_free( void *db ); /* forward declaration for the allocator */
 extern void Init_rmdbx ( void );
 extern void rmdbx_init_database ( void );
+extern void rmdbx_close_all( rmdbx_db_t* );
 extern void rmdbx_open_txn( rmdbx_db_t*, int );
 extern void rmdbx_close_txn( rmdbx_db_t*, int );
-
+extern void rmdbx_open_cursor( rmdbx_db_t* );
 extern VALUE rmdbx_gather_stats( rmdbx_db_t* );
 
 
-#endif /* define MDBX_EXT_0_9_3 */
+#endif /* define RBMDBX_EXT */
 
