@@ -37,7 +37,6 @@ def run_bench( db, msg )
 			threads.map( &:join )
 		end
 
-
 		# Long running transactions require a mutex across threads.
 		#
 		x.report( "txn per thread:" ) do
@@ -77,5 +76,4 @@ run_bench( db, "Default database flags:" )
 
 db = MDBX::Database.open( 'tmpdb', no_metasync: true )
 run_bench( db, "Disabled metasync:" )
-
 

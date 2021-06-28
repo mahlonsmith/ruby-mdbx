@@ -340,13 +340,6 @@ information about the build environment, the database environment, and
 the currently connected clients.
 
 
-## TODO
-
-  - Expose more database/collection information to statistics
-  - Support libmdbx multiple values per key DUPSORT via `put`, `get`
-    Enumerators, and a 'value' argument for `delete`.
-
-
 ## Contributing
 
 You can check out the current development source with Mercurial via its

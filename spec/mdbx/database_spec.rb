@@ -3,18 +3,16 @@
 
 require_relative '../lib/helper'
 
-
 RSpec.describe( MDBX::Database ) do
-
-	before( :all ) do
-		db = described_class.open( TEST_DATABASE.to_s )
-		db.clear
-		db.close
-	end
 
 	it "disallows direct calls to #new" do
 		expect{ described_class.new }.
 			to raise_exception( NoMethodError, /private/ )
+	end
+
+	it "raises an exception if passed unknown options" do
+		expect{ described_class.open( TEST_DATABASE.to_s, nope: true ) }.
+			to raise_exception( ArgumentError, /unknown option/i )
 	end
 
 	it "knows the env handle open/close state" do
@@ -52,12 +50,9 @@ RSpec.describe( MDBX::Database ) do
 
 		let!( :db ) { described_class.open( TEST_DATABASE.to_s ) }
 
-		before( :each ) do
-			db.clear
-		end
-
 		after( :each ) do
 			db.close
+			TEST_DATABASE.rmtree
 		end
 
 		it "can be reopened" do
@@ -86,12 +81,9 @@ RSpec.describe( MDBX::Database ) do
 
 		let!( :db ) { described_class.open( TEST_DATABASE.to_s ) }
 
-		before( :each ) do
-			db.clear
-		end
-
 		after( :each ) do
 			db.close
+			TEST_DATABASE.rmtree
 		end
 
 
@@ -181,16 +173,23 @@ RSpec.describe( MDBX::Database ) do
 	end
 
 
+	# context 'duplicate keys' do
+    #
+	# 	let( :db ) { described_class.open( TEST_DATABASE.to_s, max_collections: 5, duplicate_keys: true ) }
+    #
+	# 	after( :each ) do
+	# 		db.close
+	# 	end
+	# end
+
+
 	context 'collections' do
 
 		let!( :db ) { described_class.open( TEST_DATABASE.to_s, max_collections: 5 ) }
 
-		before( :each ) do
-			db.clear
-		end
-
 		after( :each ) do
 			db.close
+			TEST_DATABASE.rmtree
 		end
 
 		it "fail if the max_collections option is not specified when opening" do
@@ -324,6 +323,17 @@ RSpec.describe( MDBX::Database ) do
 			expect( db['doom'] ).to be_nil
 		end
 
+		it "retains other collections, only dropping what is specified" do
+			db.collection( 'boots' )
+			db.collection( 'pants' )
+			db.main
+			db.drop( 'boots' )
+
+			expect( db.collection ).to be_nil
+			expect( db['doom'] ).to be_nil
+			expect( db ).to have_key( :pants )
+		end
+
 		it "retains the collection environment when clearing data" do
 			db.collection( 'doom' )
 			db[ 'key' ] = 1
@@ -340,7 +350,7 @@ RSpec.describe( MDBX::Database ) do
 
 	context 'transactions' do
 
-		let!( :db ) { described_class.open( TEST_DATABASE.to_s, max_collections: 5 ) }
+		let( :db ) { described_class.open( TEST_DATABASE.to_s, max_collections: 5 ) }
 
 		before( :each ) do
 			db.clear
@@ -348,6 +358,7 @@ RSpec.describe( MDBX::Database ) do
 
 		after( :each ) do
 			db.close
+			TEST_DATABASE.rmtree
 		end
 
 		it "knows when a transaction is currently open" do
@@ -447,7 +458,7 @@ RSpec.describe( MDBX::Database ) do
 
 	context "iterators" do
 
-		let( :db ) {
+		let!( :db ) {
 			described_class.open( TEST_DATABASE.to_s, max_collections: 5 ).collection( 'iter' )
 		}
 
@@ -457,6 +468,7 @@ RSpec.describe( MDBX::Database ) do
 
 		after( :each ) do
 			db.close
+			TEST_DATABASE.rmtree
 		end
 
 		it "raises an exception if the caller didn't open a transaction first" do
@@ -496,12 +508,13 @@ RSpec.describe( MDBX::Database ) do
 
 	context "serialization" do
 
-		let( :db ) {
+		let!( :db ) {
 			described_class.open( TEST_DATABASE.to_s )
 		}
 
 		after( :each ) do
 			db.close
+			TEST_DATABASE.rmtree
 		end
 
 		it "uses Marshalling as default" do

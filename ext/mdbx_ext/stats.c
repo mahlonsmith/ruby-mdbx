@@ -3,8 +3,6 @@
  * Expose a bunch of mdbx internals to ruby.
  * This is all largely stolen from mdbx_stat.c.
  *
- * Entry point is rmdbx_stats() in database.c.
- *
  */
 
 #include "mdbx_ext.h"
@@ -24,6 +22,32 @@ rmdbx_gather_build_stats( VALUE stat )
 			rb_str_new_cstr(mdbx_build.options) );
 	rb_hash_aset( stat, ID2SYM(rb_intern("build_target")),
 			rb_str_new_cstr(mdbx_build.target) );
+	return;
+}
+
+
+/*
+ * Grab current memory usage.  (Available since MDBX 0.10.0).
+ */
+void
+rmdbx_gather_memory_stats( VALUE stat )
+{
+	if (! ( MDBX_VERSION_MAJOR >= 0 && MDBX_VERSION_MINOR >= 10 ) )
+		return;
+
+	VALUE mem = rb_hash_new();
+	rb_hash_aset( stat, ID2SYM(rb_intern("system_memory")), mem );
+
+	intptr_t page_size;
+	intptr_t total_pages;
+	intptr_t avail_pages;
+
+	mdbx_get_sysraminfo( &page_size, &total_pages, &avail_pages );
+
+	rb_hash_aset( mem, ID2SYM(rb_intern("pagesize")),    LONG2FIX( page_size ) );
+	rb_hash_aset( mem, ID2SYM(rb_intern("total_pages")), LONG2FIX( total_pages ) );
+	rb_hash_aset( mem, ID2SYM(rb_intern("avail_pages")), LONG2FIX( avail_pages ) );
+
 	return;
 }
 
@@ -80,6 +104,16 @@ rmdbx_gather_environment_stats(
 
 	rb_hash_aset( environ, ID2SYM(rb_intern("pagesize")),
 			INT2NUM(mstat.ms_psize) );
+	rb_hash_aset( environ, ID2SYM(rb_intern("branch_pages")),
+			LONG2NUM(mstat.ms_branch_pages) );
+	rb_hash_aset( environ, ID2SYM(rb_intern("leaf_pages")),
+			LONG2NUM(mstat.ms_leaf_pages) );
+	rb_hash_aset( environ, ID2SYM(rb_intern("overflow_pages")),
+			LONG2NUM(mstat.ms_overflow_pages) );
+	rb_hash_aset( environ, ID2SYM(rb_intern("btree_depth")),
+			INT2NUM(mstat.ms_depth) );
+	rb_hash_aset( environ, ID2SYM(rb_intern("entries")),
+			LONG2NUM(mstat.ms_entries) );
 	rb_hash_aset( environ, ID2SYM(rb_intern("last_txnid")),
 			INT2NUM(menvinfo.mi_recent_txnid) );
 	rb_hash_aset( environ, ID2SYM(rb_intern("last_reader_txnid")),
@@ -101,7 +135,7 @@ rmdbx_gather_environment_stats(
  *
  */
 int
-reader_list_callback(
+rmdbx_reader_list_cb(
 	void *ctx,
 	int num,
 	int slot,
@@ -148,7 +182,7 @@ rmdbx_gather_reader_stats(
 {
 	VALUE readers = rb_ary_new();
 
-	mdbx_reader_list( db->env, reader_list_callback, (void*)readers );
+	mdbx_reader_list( db->env, rmdbx_reader_list_cb, (void*)readers );
 	rb_hash_aset( stat, ID2SYM(rb_intern("readers")), readers );
 
 	return;
@@ -168,6 +202,7 @@ rmdbx_gather_stats( rmdbx_db_t *db )
 	MDBX_stat mstat;
 	MDBX_envinfo menvinfo;
 
+	rmdbx_gather_memory_stats( stat );
 	rmdbx_gather_build_stats( stat );
 
 	rmdbx_open_txn( db, MDBX_TXN_RDONLY );
@@ -183,9 +218,6 @@ rmdbx_gather_stats( rmdbx_db_t *db )
 	rmdbx_gather_environment_stats( stat, mstat, menvinfo );
 	rmdbx_gather_reader_stats( db, stat, mstat, menvinfo );
 
-	/* TODO: database and subdatabase stats */
-
 	return stat;
 }
-
 
