@@ -173,16 +173,6 @@ RSpec.describe( MDBX::Database ) do
 	end
 
 
-	# context 'duplicate keys' do
-    #
-	# 	let( :db ) { described_class.open( TEST_DATABASE.to_s, max_collections: 5, duplicate_keys: true ) }
-    #
-	# 	after( :each ) do
-	# 		db.close
-	# 	end
-	# end
-
-
 	context 'collections' do
 
 		let!( :db ) { described_class.open( TEST_DATABASE.to_s, max_collections: 5 ) }

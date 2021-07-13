@@ -12,5 +12,4 @@ rescue Exception => e
 end
 
 db = MDBX::Database.open( 'tmp/testdb', max_collections: 50 )
-#db = MDBX::Database.open( 'tmp/testdb', duplicate_keys: true )
 

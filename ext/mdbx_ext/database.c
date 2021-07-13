@@ -439,7 +439,14 @@ rmdbx_set_subdb( VALUE self, VALUE name )
 	if ( db->txn )
 		rb_raise( rmdbx_eDatabaseError, "Unable to change collection: transaction open" );
 
-	db->subdb = NIL_P( name ) ? NULL : StringValueCStr( name );
+	xfree( db->subdb ); 
+	db->subdb = NULL;
+
+	if ( ! NIL_P(name) ) {
+		size_t len = RSTRING_LEN( name ) + 1;
+		db->subdb = malloc( len );
+		strlcpy( db->subdb, StringValuePtr(name), len );
+	}
 
 	/* Reset the db handle and issue a single transaction to reify
 	   the collection.
@@ -786,8 +793,6 @@ rmdbx_database_initialize( int argc, VALUE *argv, VALUE self )
 		db->settings.db_flags  = db->settings.db_flags | MDBX_DB_ACCEDE;
 		db->settings.env_flags = db->settings.env_flags | MDBX_ACCEDE;
 	}
-	/* opt = rb_hash_delete( opts, ID2SYM( rb_intern("duplicate_keys") ) ); */
-	/* if ( RTEST(opt) ) db->settings.db_flags = db->settings.db_flags | MDBX_DUPSORT; */
 	opt = rb_hash_delete( opts, ID2SYM( rb_intern("exclusive") ) );
 	if ( RTEST(opt) ) db->settings.env_flags = db->settings.env_flags | MDBX_EXCLUSIVE;
 	opt = rb_hash_delete( opts, ID2SYM( rb_intern("lifo_reclaim") ) );
@@ -814,12 +819,6 @@ rmdbx_database_initialize( int argc, VALUE *argv, VALUE self )
 	if ( RTEST(opt) ) db->settings.env_flags = db->settings.env_flags | MDBX_RDONLY;
 	opt = rb_hash_delete( opts, ID2SYM( rb_intern("writemap") ) );
 	if ( RTEST(opt) ) db->settings.env_flags = db->settings.env_flags | MDBX_WRITEMAP;
-
-	/* Bail early on incompatible options. FIXME: I don't think this is true. */
-	/* if ( db->settings.max_collections > 0 && */
-	/* 		rmdbx_flag_enabled( db->settings.db_flags, MDBX_DUPSORT ) ) { */
-	/* 	rb_raise( rb_eArgError, "Collections and multiple values per key are mutually exclusive options." ); */
-	/* } */
 
 	if ( rb_hash_size_num(opts) > 0 ) {
 		rb_raise( rb_eArgError, "Unknown option(s): %"PRIsVALUE, opts );
