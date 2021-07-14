@@ -1,6 +1,20 @@
 # Release History for MDBX
 
 ---
+## v0.3.2 [2021-07-13] Mahlon E. Smith <mahlon@martini.nu>
+
+Bugfixes:
+
+ - Fix double memory allocation during initialization.
+ - Make various ruby->c string allocations safe with the garbage collector.
+
+
+Minutiae:
+
+ - Raise exception if instantiating with invalid options.
+
+
+---
 ## v0.3.1 [2021-05-16] Mahlon E. Smith <mahlon@martini.nu>
 
 Bugfix:
