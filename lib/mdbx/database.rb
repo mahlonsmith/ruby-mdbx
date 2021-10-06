@@ -364,6 +364,34 @@ class MDBX::Database
 	protected
 	#########
 
+
+	### Safely serialize a value, closing any open transaction and re-raising
+	### if necessary.
+	###
+	def serialize( val )
+		return val unless self.serializer
+		return self.serializer.call( val )
+
+	rescue => err
+		self.close_transaction( false )
+		raise err
+	end
+
+
+	### Safely deserialize a value, closing any open transaction and re-raising
+	### if necessary.
+	###
+	def deserialize( val )
+		return val unless self.deserializer
+		return self.deserializer.call( val )
+
+	rescue => err
+		self.close_transaction( false )
+		raise err
+	end
+
+
+
 	### Yield and return the block, opening a snapshot first if
 	### there isn't already a transaction in progress.  Closes
 	### the snapshot if this method opened it.
