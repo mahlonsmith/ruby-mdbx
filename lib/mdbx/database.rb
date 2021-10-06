@@ -8,6 +8,9 @@ require 'mdbx' unless defined?( MDBX )
 # The primary class for interacting with an MDBX database.
 #
 class MDBX::Database
+	extend Loggability
+
+	log_to :mdbx
 
 	### call-seq:
 	###    MDBX::Database.open( path ) => db

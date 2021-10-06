@@ -1,5 +1,7 @@
 source "https://rubygems.org/"
 
+gem 'loggability', '~> 0.17'
+
 group( :development ) do
 	gem 'pry',                     '~> 0.13'
 	gem 'rake',                    '~> 13.0'
