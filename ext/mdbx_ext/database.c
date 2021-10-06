@@ -135,30 +135,12 @@ rmdbx_key_for( VALUE key, MDBX_val *ckey )
 void
 rmdbx_val_for( VALUE self, VALUE val, MDBX_val *data )
 {
-	VALUE serialize_proc = rb_iv_get( self, "@serializer" );
-
-	if ( ! NIL_P( serialize_proc ) )
-		val = rb_funcall( serialize_proc, rb_intern("call"), 1, val );
-
+	val = rb_funcall( self, rb_intern("serialize"), 1, val );
 	Check_Type( val, T_STRING );
 
 	data->iov_len  = RSTRING_LEN( val );
 	data->iov_base = malloc( data->iov_len );
 	strlcpy( data->iov_base, StringValuePtr(val), data->iov_len + 1 );
-}
-
-
-/*
- * Deserialize and return a value.
- */
-VALUE
-rmdbx_deserialize( VALUE self, VALUE val )
-{
-	VALUE deserialize_proc = rb_iv_get( self, "@deserializer" );
-	if ( ! NIL_P( deserialize_proc ) )
-		val = rb_funcall( deserialize_proc, rb_intern("call"), 1, val );
-
-	return val;
 }
 
 
@@ -355,7 +337,7 @@ rmdbx_get_val( VALUE self, VALUE key )
 	switch ( rc ) {
 		case MDBX_SUCCESS:
 			rv = rb_str_new( data.iov_base, data.iov_len );
-			return rmdbx_deserialize( self, rv );
+			return rb_funcall( self, rb_intern("deserialize"), 1, rv );
 
 		case MDBX_NOTFOUND:
 			return Qnil;
@@ -439,13 +421,17 @@ rmdbx_set_subdb( VALUE self, VALUE name )
 	if ( db->txn )
 		rb_raise( rmdbx_eDatabaseError, "Unable to change collection: transaction open" );
 
-	xfree( db->subdb ); 
+	xfree( db->subdb );
 	db->subdb = NULL;
 
 	if ( ! NIL_P(name) ) {
 		size_t len = RSTRING_LEN( name ) + 1;
 		db->subdb = malloc( len );
 		strlcpy( db->subdb, StringValuePtr(name), len );
+		rmdbx_log_obj( self, "debug", "setting subdb: %s", RSTRING_PTR(name) );
+	}
+	else {
+		rmdbx_log_obj( self, "debug", "clearing subdb" );
 	}
 
 	/* Reset the db handle and issue a single transaction to reify
@@ -644,11 +630,11 @@ rmdbx_each_value_i( VALUE self )
 
 	if ( mdbx_cursor_get( db->cursor, &key, &data, MDBX_FIRST ) == MDBX_SUCCESS ) {
 		VALUE rv = rb_str_new( data.iov_base, data.iov_len );
-		rb_yield( rmdbx_deserialize( self, rv ) );
+		rb_yield( rb_funcall( self, rb_intern("deserialize"), 1, rv ) );
 
 		while ( mdbx_cursor_get( db->cursor, &key, &data, MDBX_NEXT ) == MDBX_SUCCESS ) {
 			rv = rb_str_new( data.iov_base, data.iov_len );
-			rb_yield( rmdbx_deserialize( self, rv ) );
+			rb_yield( rb_funcall( self, rb_intern("deserialize"), 1, rv ) );
 		}
 	}
 
@@ -694,12 +680,15 @@ rmdbx_each_pair_i( VALUE self )
 	if ( mdbx_cursor_get( db->cursor, &key, &data, MDBX_FIRST ) == MDBX_SUCCESS ) {
 		VALUE rkey = rb_str_new( key.iov_base, key.iov_len );
 		VALUE rval = rb_str_new( data.iov_base, data.iov_len );
-		rb_yield( rb_assoc_new( rkey, rmdbx_deserialize( self, rval ) ) );
+		rval = rb_funcall( self, rb_intern("deserialize"), 1, rval );
+		rb_yield( rb_assoc_new( rkey, rval  ) );
 
 		while ( mdbx_cursor_get( db->cursor, &key, &data, MDBX_NEXT ) == MDBX_SUCCESS ) {
 			rkey = rb_str_new( key.iov_base, key.iov_len );
 			rval = rb_str_new( data.iov_base, data.iov_len );
-			rb_yield( rb_assoc_new( rkey, rmdbx_deserialize( self, rval ) ) );
+			rval = rb_funcall( self, rb_intern("deserialize"), 1, rval );
+
+			rb_yield( rb_assoc_new( rkey, rval ) );
 		}
 	}
 

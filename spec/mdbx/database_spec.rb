@@ -265,12 +265,22 @@ RSpec.describe( MDBX::Database ) do
 
 		it "reverts back to previous collection if the block raises an exception" do
 			expect( db.collection ).to be_nil
-			begin
+			expect {
 				db.collection( 'bucket1' ) do
 					db.collection( 'bucket2' ) { raise "ka-bloooey!" }
 				end
-			rescue
-			end
+			}.to raise_error( RuntimeError, /ka-bloooey!/ )
+			expect( db.collection ).to be_nil
+		end
+
+		it "reverts back to previous collection if serialization fails" do
+            db.serializer = ->( v ) { raise "ka-bloooey!" }
+			expect( db.collection ).to be_nil
+			expect {
+				db.collection( 'bucket1' ) do
+					db.collection( 'bucket2' ) {|sdb| sdb['foo'] = 1 }
+				end
+			}.to raise_error( RuntimeError, /ka-bloooey!/ )
 			expect( db.collection ).to be_nil
 		end
 
