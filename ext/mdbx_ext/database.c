@@ -123,7 +123,7 @@ rmdbx_key_for( VALUE key, MDBX_val *ckey )
 	VALUE key_str  = rb_funcall( key, rb_intern("to_s"), 0 );
 	ckey->iov_len  = RSTRING_LEN( key_str );
 	ckey->iov_base = malloc( ckey->iov_len );
-	strlcpy( ckey->iov_base, StringValuePtr(key_str), ckey->iov_len + 1 );
+	memcpy( ckey->iov_base, StringValuePtr(key_str), ckey->iov_len );
 }
 
 
@@ -140,7 +140,7 @@ rmdbx_val_for( VALUE self, VALUE val, MDBX_val *data )
 
 	data->iov_len  = RSTRING_LEN( val );
 	data->iov_base = malloc( data->iov_len );
-	strlcpy( data->iov_base, StringValuePtr(val), data->iov_len + 1 );
+	memcpy( data->iov_base, StringValuePtr(val), data->iov_len );
 }
 
 
