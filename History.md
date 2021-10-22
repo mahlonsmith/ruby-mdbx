@@ -1,6 +1,20 @@
 # Release History for MDBX
 
 ---
+## v0.3.3 [2021-10-22] Mahlon E. Smith <mahlon@martini.nu>
+
+Bugfixes:
+
+ - Close any open transactions if serialization functions fail.
+ - Don't use functions that assume NUL is the stream terminator.
+
+
+Enhancements:
+
+ - Add Loggability for debug output.
+
+
+---
 ## v0.3.2 [2021-07-13] Mahlon E. Smith <mahlon@martini.nu>
 
 Bugfixes:
