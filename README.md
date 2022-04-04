@@ -1,23 +1,11 @@
 
 # Ruby::MDBX
 
-home
-: https://code.martini.nu/ruby-mdbx
+**home**: https://code.martini.nu/fossil/ruby-mdbx
 
-code
-: https://code.martini.nu/ruby-mdbx
+**docs**: https://martini.nu/docs/ruby-mdbx
 
-docs
-: https://martini.nu/docs/ruby-mdbx
-
-github
-: https://github.com/mahlon/ruby-mdbx
-
-gitlab
-: https://gitlab.com/mahlon/ruby-mdbx
-
-sourcehut:
-: https://hg.sr.ht/~mahlon/ruby-mdbx
+**github**: https://github.com/mahlon/ruby-mdbx
 
 
 ## Description
@@ -342,8 +330,8 @@ the currently connected clients.
 
 ## Contributing
 
-You can check out the current development source with Mercurial via its
-[home repo](https://code.martini.nu/ruby-mdbx), or with Git at its
+You can check out the current development source with Fossil via its
+[home repo](https://code.martini.nu/fossil/ruby-mdbx), or with Git at its
 [project mirror](https://gitlab.com/mahlon/ruby-mdbx).
 
 After checking out the source, run:
@@ -362,7 +350,7 @@ development.
 
 ## License
 
-Copyright (c) 2020-2021 Mahlon E. Smith
+Copyright (c) 2020-2022 Mahlon E. Smith
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
