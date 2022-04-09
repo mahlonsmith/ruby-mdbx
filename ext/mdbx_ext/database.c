@@ -102,16 +102,6 @@ rmdbx_closed_p( VALUE self )
 
 
 /*
- * Check if a given +flag+ is enabled for flag +val+.
- */
-int
-rmdbx_flag_enabled( val, flag )
-{
-	return ( val & flag ) == flag;
-}
-
-
-/*
  * Given a ruby string +key+ and a pointer to an MDBX_val, prepare the
  * key for usage within mdbx.  All keys are explicitly converted to
  * strings.
