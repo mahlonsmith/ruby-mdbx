@@ -18,7 +18,7 @@ of properties and capabilities, focused on creating unique lightweight
 solutions.
 
 For more information about libmdbx (features, limitations, etc), see the
-[introduction](https://erthink.github.io/libmdbx/intro.html).
+[introduction](https://libmdbx.dqdkfa.ru).
 
 
 ## Prerequisites
