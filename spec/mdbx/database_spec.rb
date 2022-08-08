@@ -71,8 +71,7 @@ RSpec.describe( MDBX::Database ) do
 			# here for behavior.
 			expect {
 				described_class.open( TEST_DATABASE.to_s )
-			}.
-			to raise_exception( MDBX::DatabaseError, /environment is already used/ )
+            }.to raise_exception( MDBX::DatabaseError, /resource \w+ unavailable/i )
 		end
 	end
 

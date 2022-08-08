@@ -85,7 +85,7 @@ class MDBX::Database
 	###
 	### [:no_threadlocal]
 	###   Parallelize read-only transactions across threads.  Writes are
-	###   always thread local. (See MDBX documentatoin for details.)
+	###   always thread local. (See MDBX documentation for details.)
 	###
 	### [:readonly]
 	###   Reject any write attempts while using this database handle.
@@ -364,7 +364,6 @@ class MDBX::Database
 	protected
 	#########
 
-
 	### Safely serialize a value, closing any open transaction and re-raising
 	### if necessary.
 	###
@@ -389,7 +388,6 @@ class MDBX::Database
 		self.close_transaction( false )
 		raise err
 	end
-
 
 
 	### Yield and return the block, opening a snapshot first if

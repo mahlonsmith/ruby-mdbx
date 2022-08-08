@@ -860,7 +860,7 @@ static VALUE rmdbx_init_copy( VALUE copy, VALUE orig )
 void
 rmdbx_init_database()
 {
-	rmdbx_cDatabase = rb_define_class_under( rmdbx_mMDBX, "Database", rb_cData );
+	rmdbx_cDatabase = rb_define_class_under( rmdbx_mMDBX, "Database", rb_cObject );
 
 #ifdef FOR_RDOC
 	rmdbx_mMDBX = rb_define_module( "MDBX" );
