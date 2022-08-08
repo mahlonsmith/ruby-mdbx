@@ -24,7 +24,7 @@ For more information about libmdbx (features, limitations, etc), see the
 ## Prerequisites
 
 * Ruby 2.6+
-* [libmdbx](https://github.com/erthink/libmdbx)
+* [libmdbx](https://gitflic.ru/project/erthink/libmdbx)
 
 
 ## Installation
