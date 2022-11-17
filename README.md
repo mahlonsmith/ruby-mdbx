@@ -5,7 +5,7 @@
 
 **docs**: https://martini.nu/docs/ruby-mdbx
 
-**github**: https://github.com/mahlon/ruby-mdbx
+**github**: https://github.com/mahlonsmith/ruby-mdbx
 
 
 ## Description
