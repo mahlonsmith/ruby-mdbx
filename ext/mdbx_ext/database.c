@@ -361,10 +361,9 @@ rmdbx_put_val( VALUE self, VALUE key, VALUE val )
 		rc = mdbx_del( db->txn, db->dbi, &ckey, NULL );
 	}
 	else {
-		MDBX_val old;
 		MDBX_val data;
 		rmdbx_val_for( self, val, &data );
-		rc = mdbx_replace( db->txn, db->dbi, &ckey, &data, &old, 0 );
+		rc = mdbx_put( db->txn, db->dbi, &ckey, &data, 0 );
 		xfree( data.iov_base );
 	}
 
