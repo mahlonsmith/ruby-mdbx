@@ -1,11 +1,14 @@
 
 # Ruby::MDBX
 
-**home**: https://code.martini.nu/fossil/ruby-mdbx
+home
+: https://code.martini.nu/fossil/ruby-mdbx
 
-**docs**: https://martini.nu/docs/ruby-mdbx
+docs
+: https://martini.nu/docs/ruby-mdbx
 
-**github**: https://github.com/mahlonsmith/ruby-mdbx
+github mirror
+: https://github.com/mahlonsmith/ruby-mdbx
 
 
 ## Description

@@ -1,6 +1,14 @@
 # Release History for MDBX
 
 ---
+## v0.3.4 [2022-12-21] Mahlon E. Smith <mahlon@martini.nu>
+
+Bugfixes:
+
+ - Don't use mdbx_replace() when not using the original value(s)
+
+
+---
 ## v0.3.3 [2021-10-22] Mahlon E. Smith <mahlon@martini.nu>
 
 Bugfixes:
