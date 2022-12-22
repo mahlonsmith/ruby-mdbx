@@ -19,5 +19,6 @@ Rake::DevEiate.setup( 'mdbx' ) do |project|
 		focused on creating unique lightweight solutions.
 	END_DESC
 	project.authors = [ 'Mahlon E. Smith <mahlon@martini.nu>' ]
+    project.rdoc_generator = :sixfish
 end
 

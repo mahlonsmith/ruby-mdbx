@@ -15,6 +15,8 @@ github mirror
 
 This is a Ruby (MRI) binding for the libmdbx database library.
 
+[![Gem Version](https://badge.fury.io/rb/mdbx.svg)](https://badge.fury.io/rb/mdbx)
+
 libmdbx is an extremely fast, compact, powerful, embedded, transactional
 key-value database, with a permissive license. libmdbx has a specific set
 of properties and capabilities, focused on creating unique lightweight
