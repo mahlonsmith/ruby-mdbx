@@ -236,6 +236,15 @@ RSpec.describe( MDBX::Database ) do
 			expect( db.collection ).to eq( 'bucket' )
 		end
 
+        it "ensures transactions have closed if deserialization fails" do
+            db.deserializer = ->( v ) { raise "ka-bloooey!" }
+            db['foo'] = 1
+			expect {
+				db.transaction { db['foo'] }
+			}.to raise_error( RuntimeError, /ka-bloooey!/ )
+			expect( db.in_transaction? ).to be_falsey
+        end
+
 		it "revert back to the previous collection when used in a block" do
 			expect( db.collection ).to be_nil
 			db.collection( 'bucket' ) { 'no-op' }
