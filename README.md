@@ -7,7 +7,7 @@ home
 docs
 : https://martini.nu/docs/ruby-mdbx
 
-github mirror
+github_mirror
 : https://github.com/mahlonsmith/ruby-mdbx
 
 
@@ -332,12 +332,84 @@ Calling `statistics` on a database handle will provide a subset of
 information about the build environment, the database environment, and
 the currently connected clients.
 
+```bash
+% ruby -rmdbx -rjson -e "puts JSON.generate( MDBX::Database.open( '/tmp/testdb' ).statistics )" | jq
+```
+
+```json
+{
+  "build": {
+    "compiler": "FreeBSD clang version 13.0.0 (git@github.com:llvm/llvm-project.git llvmorg-13.0.0-0-gd7b669b3a303)",
+    "flags": "-DNDEBUG=1 -std=gnu++2b -O2 -pipe -Wall -Werror -Wextra -Wpedantic -ffunction-sections -fPIC -fvisibility=hidden -std=gnu11 -pthread -Wno-error=attributes -fstack-protector-strong -fno-strict-aliasing -fstack-
+protector-strong",
+    "options": {
+      "MDBX_DEBUG": 0,
+      "MDBX_WORDBITS": 64,
+      "BYTE_ORDER": "LITTLE_ENDIAN",
+      "MDBX_ENV_CHECKPID": "AUTO",
+      "MDBX_TXN_CHECKOWNER": "AUTO",
+      "MDBX_64BIT_ATOMIC": "AUTO",
+      "MDBX_64BIT_CAS": "AUTO",
+      "MDBX_TRUST_RTC": "AUTO",
+      "MDBX_ENABLE_REFUND": 1,
+      "MDBX_ENABLE_MADVISE": 1,
+      "_GNU_SOURCE": "NO",
+      "MDBX_LOCKING": "AUTO",
+      "MDBX_USE_OFDLOCKS": "AUTO",
+      "MDBX_CACHELINE_SIZE": 64,
+      "MDBX_CPU_WRITEBACK_INCOHERENT": 0,
+      "MDBX_MMAP_INCOHERENT_CPU_CACHE": 0,
+      "MDBX_MMAP_INCOHERENT_FILE_WRITE": 0,
+      "MDBX_UNALIGNED_OK": 0,
+      "MDBX_PNL_ASCENDING": 0
+    },
+    "target": "x86_64-unknown-freebsd13.1"
+  },
+    "system_memory": {
+    "pagesize": 4096,
+    "total_pages": 33522850,
+    "avail_pages": 4170509
+  },
+  "environment": {
+    "pagesize": 4096,
+    "branch_pages": 0,
+    "leaf_pages": 0,
+    "overflow_pages": 0,
+    "btree_depth": 0,
+    "entries": 0,
+    "last_txnid": 3,
+    "last_reader_txnid": 3,
+    "max_readers": 120,
+    "readers_in_use": 1,
+    "datafile": {
+      "size_current": 12288,
+      "pages": 3,
+      "type": "dynamic",
+      "size_lower": 12288,
+      "size_upper": 1048576,
+      "growth_step": 65536,
+      "shrink_threshold": 131072
+    }
+  },
+  "readers": [
+    {
+      "slot": 0,
+      "pid": 16731,
+      "thread": 34374492160,
+      "txnid": 0,
+      "lag": 0,
+      "bytes_used": 0,
+      "bytes_retired": 0
+    }
+  ]
+}
+```
 
 ## Contributing
 
 You can check out the current development source with Fossil via its
 [home repo](https://code.martini.nu/fossil/ruby-mdbx), or with Git at its
-[project mirror](https://gitlab.com/mahlon/ruby-mdbx).
+[project mirror](https://github.com/mahlonsmith/ruby-mdbx)
 
 After checking out the source, run:
 

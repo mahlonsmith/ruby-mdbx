@@ -64,7 +64,7 @@ rmdbx_log( const char *level, const char *fmt, va_dcl )
  * MDBX initialization
  */
 void
-Init_mdbx_ext()
+Init_mdbx_ext( void )
 {
 	rmdbx_mMDBX = rb_define_module( "MDBX" );
 

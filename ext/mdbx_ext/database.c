@@ -857,7 +857,7 @@ static VALUE rmdbx_init_copy( VALUE copy, VALUE orig )
  * Initialization for the MDBX::Database class.
  */
 void
-rmdbx_init_database()
+rmdbx_init_database( void )
 {
 	rmdbx_cDatabase = rb_define_class_under( rmdbx_mMDBX, "Database", rb_cObject );
 
