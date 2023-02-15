@@ -28,7 +28,7 @@ For more information about libmdbx (features, limitations, etc), see the
 
 ## Prerequisites
 
-* Ruby 2.6+
+* Ruby 3.0+
 * [libmdbx](https://gitflic.ru/project/erthink/libmdbx)
 
 
@@ -420,6 +420,19 @@ This will install dependencies, and do any other necessary setup for
 development.
 
 
+## Reporting Issues
+
+Tests are performed against the latest stable MRI Ruby, and I endeavor to test
+against the latest stable libmdbx (as of this writing, the 0.11.x versioning),
+on both x86 and ARM chipsets.
+
+Things may work for you in other environments - I'm just not matrix testing
+every possible permutation.
+
+Bugs reported against tested environments take precedence over others.  Please
+report any issues [here](https://code.martini.nu/fossil/ruby-mdbx/tktnew).
+
+
 ## Authors
 
 - Mahlon E. Smith <mahlon@martini.nu>
@@ -427,7 +440,7 @@ development.
 
 ## License
 
-Copyright (c) 2020-2022 Mahlon E. Smith
+Copyright (c) 2020-2023 Mahlon E. Smith
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
