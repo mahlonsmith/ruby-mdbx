@@ -4,6 +4,7 @@
 require 'mkmf'
 
 $CFLAGS << ' -Wno-suggest-attribute=format'
+$CFLAGS << ' -Wno-unknown-warning-option'
 
 have_library( 'mdbx' )  or abort "No mdbx library!"
 have_header( 'mdbx.h' ) or abort "No mdbx.h header!"

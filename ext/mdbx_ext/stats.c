@@ -65,21 +65,21 @@ rmdbx_gather_datafile_stats(
 	rb_hash_aset( environ, ID2SYM(rb_intern("datafile")), datafile );
 
 	rb_hash_aset( datafile, ID2SYM(rb_intern("size_current")),
-			INT2NUM(menvinfo.mi_geo.current) );
+			LONG2NUM(menvinfo.mi_geo.current) );
 	rb_hash_aset( datafile, ID2SYM(rb_intern("pages")),
-			INT2NUM(menvinfo.mi_geo.current / mstat.ms_psize) );
+			LONG2NUM(menvinfo.mi_geo.current / mstat.ms_psize) );
 
 	if ( menvinfo.mi_geo.lower != menvinfo.mi_geo.upper ) {
 		rb_hash_aset( datafile, ID2SYM(rb_intern("type")),
 			rb_str_new_cstr("dynamic") );
 		rb_hash_aset( datafile, ID2SYM(rb_intern("size_lower")),
-			INT2NUM( menvinfo.mi_geo.lower ) );
+			LONG2NUM( menvinfo.mi_geo.lower ) );
 		rb_hash_aset( datafile, ID2SYM(rb_intern("size_upper")),
 			LONG2FIX( menvinfo.mi_geo.upper ) );
 		rb_hash_aset( datafile, ID2SYM(rb_intern("growth_step")),
-			INT2NUM( menvinfo.mi_geo.grow ) );
+			LONG2NUM( menvinfo.mi_geo.grow ) );
 		rb_hash_aset( datafile, ID2SYM(rb_intern("shrink_threshold")),
-			INT2NUM( menvinfo.mi_geo.shrink ) );
+			LONG2NUM( menvinfo.mi_geo.shrink ) );
 	}
 	else {
 		rb_hash_aset( datafile, ID2SYM(rb_intern("type")),
@@ -115,9 +115,9 @@ rmdbx_gather_environment_stats(
 	rb_hash_aset( environ, ID2SYM(rb_intern("entries")),
 			LONG2NUM(mstat.ms_entries) );
 	rb_hash_aset( environ, ID2SYM(rb_intern("last_txnid")),
-			INT2NUM(menvinfo.mi_recent_txnid) );
+			LONG2NUM(menvinfo.mi_recent_txnid) );
 	rb_hash_aset( environ, ID2SYM(rb_intern("last_reader_txnid")),
-			INT2NUM(menvinfo.mi_latter_reader_txnid) );
+			LONG2NUM(menvinfo.mi_latter_reader_txnid) );
 	rb_hash_aset( environ, ID2SYM(rb_intern("max_readers")),
 			INT2NUM(menvinfo.mi_maxreaders) );
 	rb_hash_aset( environ, ID2SYM(rb_intern("readers_in_use")),
@@ -153,7 +153,7 @@ rmdbx_reader_list_cb(
 	rb_hash_aset( reader, ID2SYM(rb_intern("pid")),
 			LONG2FIX( pid ) );
 	rb_hash_aset( reader, ID2SYM(rb_intern("thread")),
-			LONG2FIX( thread ) );
+			LONG2FIX( (uint64_t)thread ) );
 	rb_hash_aset( reader, ID2SYM(rb_intern("txnid")),
 			LONG2FIX( txnid ) );
 	rb_hash_aset( reader, ID2SYM(rb_intern("lag")),
