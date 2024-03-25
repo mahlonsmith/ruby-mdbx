@@ -168,6 +168,12 @@ rmdbx_open_env( VALUE self )
 		rb_raise( rmdbx_eDatabaseError, "mdbx_env_open: (%d) %s", rc, mdbx_strerror(rc) );
 	}
 
+	/* Force populate the db->dbi handle.  Under 0.12.x, getting a
+	 * 'permission denied' doing this for the first access with a RDONLY
+	 * for some reason. */
+	rmdbx_open_txn( db, MDBX_TXN_READWRITE );
+	rmdbx_close_txn( db, RMDBX_TXN_ROLLBACK );
+
 	db->state.open = 1;
 	return Qtrue;
 }
@@ -189,8 +195,10 @@ rmdbx_clear( VALUE self )
 	rmdbx_open_txn( db, MDBX_TXN_READWRITE );
 	int rc = mdbx_drop( db->txn, db->dbi, false );
 
-	if ( rc != MDBX_SUCCESS )
+	if ( rc != MDBX_SUCCESS ) {
+		rmdbx_close_txn( db, RMDBX_TXN_ROLLBACK );
 		rb_raise( rmdbx_eDatabaseError, "mdbx_drop: (%d) %s", rc, mdbx_strerror(rc) );
+	}
 
 	rmdbx_close_txn( db, RMDBX_TXN_COMMIT );
 
@@ -229,14 +237,22 @@ rmdbx_drop( VALUE self, VALUE name )
 	rmdbx_open_txn( db, MDBX_TXN_READWRITE );
 	int rc = mdbx_drop( db->txn, db->dbi, true );
 
-	if ( rc != MDBX_SUCCESS )
+	if ( rc != MDBX_SUCCESS ) {
+		rmdbx_close_txn( db, RMDBX_TXN_ROLLBACK );
 		rb_raise( rmdbx_eDatabaseError, "mdbx_drop: (%d) %s", rc, mdbx_strerror(rc) );
+	}
 
 	rmdbx_close_txn( db, RMDBX_TXN_COMMIT );
 
 	/* Reset the current collection to the top level. */
 	db->subdb = NULL;
 	rmdbx_close_dbi( db ); /* ensure next access is not in the defunct subdb */
+
+	/* Force populate the new db->dbi handle.  Under 0.12.x, getting a
+	 * 'permission denied' doing this for the first access with a RDONLY
+	 * for some reason. */
+	rmdbx_open_txn( db, MDBX_TXN_READWRITE );
+	rmdbx_close_txn( db, RMDBX_TXN_ROLLBACK );
 
 	return self;
 }
@@ -830,7 +846,7 @@ rmdbx_stats( VALUE self )
  *    db.clone => [copy of db]
  *
  * Copy the object (clone/dup).  The returned copy is closed and needs
- * to be reopened before use.  This function likely  has limited use,
+ * to be reopened before use.  This function likely has limited use,
  * considering you can't open two handles within the same process.
  */
 static VALUE rmdbx_init_copy( VALUE copy, VALUE orig )

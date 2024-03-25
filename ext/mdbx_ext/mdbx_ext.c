@@ -58,8 +58,6 @@ rmdbx_log( const char *level, const char *fmt, va_dcl )
 }
 
 
-
-
 /*
  * MDBX initialization
  */

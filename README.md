@@ -423,7 +423,7 @@ development.
 ## Reporting Issues
 
 Tests are performed against the latest stable MRI Ruby, and I endeavor to test
-against the latest stable libmdbx (as of this writing, the 0.11.x versioning),
+against the latest stable libmdbx (as of this writing, the 0.12.x versioning),
 on both x86 and ARM chipsets.
 
 Things may work for you in other environments - I'm just not matrix testing
