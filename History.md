@@ -1,6 +1,17 @@
 # Release History for MDBX
 
 ---
+## v0.3.5 [2023-03-24] Mahlon E. Smith <mahlon@martini.nu>
+
+Add support for libmdbx 0.12.x.
+
+
+Bugfixes:
+
+ - Ensure transactions are closed if exceptions are raised.
+
+
+---
 ## v0.3.4 [2022-12-21] Mahlon E. Smith <mahlon@martini.nu>
 
 Bugfixes:
