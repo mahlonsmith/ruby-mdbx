@@ -1,7 +1,7 @@
 # Release History for MDBX
 
 ---
-## v0.3.5 [2023-03-24] Mahlon E. Smith <mahlon@martini.nu>
+## v0.3.5 [2024-03-24] Mahlon E. Smith <mahlon@martini.nu>
 
 Add support for libmdbx 0.12.x.
 

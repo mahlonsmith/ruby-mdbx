@@ -440,7 +440,7 @@ report any issues [here](https://code.martini.nu/fossil/ruby-mdbx/tktnew).
 
 ## License
 
-Copyright (c) 2020-2023 Mahlon E. Smith
+Copyright (c) 2020-2024 Mahlon E. Smith
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
