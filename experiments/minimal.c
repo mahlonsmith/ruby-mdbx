@@ -1,6 +1,6 @@
 
 /*
-* clang -L/usr/local/lib -I/usr/local/include -lmdbx minimal.c -o minimal-tset
+* clang -L/usr/local/lib -I/usr/local/include -lmdbx minimal.c -o minimal-test
 */
 
 #include "mdbx.h"
@@ -27,7 +27,7 @@ main()
 	 *
 	 */
 	// rc = mdbx_txn_begin( env, NULL, MDBX_TXN_READWRITE, &txn );
-	
+
 	/*
 	 * Using a readonly transaction handle seemingly fails for
 	 * use with mdbx_dbi_open().

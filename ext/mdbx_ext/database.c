@@ -780,8 +780,6 @@ rmdbx_database_initialize( int argc, VALUE *argv, VALUE self )
 
 	/* Environment and database options setup, overrides.
 	 */
-	opt = rb_hash_delete( opts, ID2SYM( rb_intern("coalesce") ) );
-	if ( RTEST(opt) ) db->settings.env_flags = db->settings.env_flags | MDBX_COALESCE;
 	opt = rb_hash_delete( opts, ID2SYM( rb_intern("compatible") ) );
 	if ( RTEST(opt) ) {
 		db->settings.db_flags  = db->settings.db_flags | MDBX_DB_ACCEDE;
