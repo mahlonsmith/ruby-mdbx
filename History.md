@@ -1,6 +1,13 @@
 # Release History for MDBX
 
 ---
+## v0.3.7 [2025-02-06] Mahlon E. Smith <mahlon@martini.nu>
+
+Minutiae:
+
+ - Update for deprecations in 0.13.x libmdbx stable.
+
+
 ## v0.3.6 [2024-06-12] Mahlon E. Smith <mahlon@martini.nu>
 
 
