@@ -32,11 +32,6 @@ class MDBX::Database
 	### Unless otherwise mentioned, option keys are symbols, and values
 	### are boolean.
 	###
-	### [:coalesce]
-	###   Attempt to coalesce items for the garbage collector,
-	###   potentialy increasing the chance of unallocating storage
-	###   earlier.
-	###
 	### [:compatible]
 	###   Skip compatibility checks when opening an in-use database with
 	###   unknown or mismatched flag values.
@@ -83,7 +78,7 @@ class MDBX::Database
 	###   random reads wunder low memory conditions.  Default behavior
 	###   is to dynamically choose when to use or omit readahead.
 	###
-	### [:no_threadlocal]
+	### [:no_stickythreads]
 	###   Parallelize read-only transactions across threads.  Writes are
 	###   always thread local. (See MDBX documentation for details.)
 	###
