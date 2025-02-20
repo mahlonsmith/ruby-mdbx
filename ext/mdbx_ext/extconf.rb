@@ -9,6 +9,8 @@ $CFLAGS << ' -Wno-unknown-warning-option'
 have_library( 'mdbx' )  or abort "No mdbx library!"
 have_header( 'mdbx.h' ) or abort "No mdbx.h header!"
 
+have_const( 'MDBX_NOSTICKYTHREADS', 'mdbx.h' )
+
 create_header()
 create_makefile( 'mdbx_ext' )
 

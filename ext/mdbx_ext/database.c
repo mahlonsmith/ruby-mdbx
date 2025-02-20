@@ -805,8 +805,13 @@ rmdbx_database_initialize( int argc, VALUE *argv, VALUE self )
 	if ( RTEST(opt) ) db->settings.env_flags = db->settings.env_flags | MDBX_NOSUBDIR;
 	opt = rb_hash_delete( opts, ID2SYM( rb_intern("no_readahead") ) );
 	if ( RTEST(opt) ) db->settings.env_flags = db->settings.env_flags | MDBX_NORDAHEAD;
+#if defined(HAVE_CONST_MDBX_NOSTICKYTHREADS)
 	opt = rb_hash_delete( opts, ID2SYM( rb_intern("no_stickythreads") ) );
 	if ( RTEST(opt) ) db->settings.env_flags = db->settings.env_flags | MDBX_NOSTICKYTHREADS;
+#else
+	opt = rb_hash_delete( opts, ID2SYM( rb_intern("no_threadlocal") ) );
+	if ( RTEST(opt) ) db->settings.env_flags = db->settings.env_flags | MDBX_NOTLS;
+#endif
 	opt = rb_hash_delete( opts, ID2SYM( rb_intern("readonly") ) );
 	if ( RTEST(opt) ) db->settings.env_flags = db->settings.env_flags | MDBX_RDONLY;
 	opt = rb_hash_delete( opts, ID2SYM( rb_intern("writemap") ) );
