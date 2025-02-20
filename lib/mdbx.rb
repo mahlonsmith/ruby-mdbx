@@ -13,7 +13,7 @@ module MDBX
 	extend Loggability
 
 	# The version of this gem.
-	VERSION = '0.3.7'
+	VERSION = '0.3.8'
 
 
 	log_as :mdbx
