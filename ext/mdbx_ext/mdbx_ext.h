@@ -3,6 +3,7 @@
 #include "extconf.h"
 
 #include "mdbx.h"
+#include "ruby/thread.h"
 
 #ifndef RBMDBX_EXT
 #define RBMDBX_EXT

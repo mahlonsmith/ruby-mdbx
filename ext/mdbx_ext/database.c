@@ -465,6 +465,32 @@ rmdbx_in_transaction_p( VALUE self )
 }
 
 
+struct txn_open_args_s {
+	rmdbx_db_t *db;
+	int rwflag;
+};
+
+
+/* Opens a transaction outside of th GVL. */
+void *
+rmdbx_open_txn_without_gvl( void *ptr )
+{
+	// struct query_call *qcall = (struct query_call *)ptr;
+	struct txn_open_args_s *txn_open_args = (struct txn_open_args_s *)ptr;
+
+	rmdbx_db_t *db = txn_open_args->db;
+
+	int rc = mdbx_txn_begin(
+		db->env,
+		NULL,
+		txn_open_args->rwflag,
+		&db->txn
+	);
+
+	return (void *)rc;
+}
+
+
 /*
  * Open a new database transaction.  If a transaction is already
  * open, this is a no-op.
@@ -476,7 +502,17 @@ rmdbx_open_txn( rmdbx_db_t *db, int rwflag )
 {
 	if ( db->txn ) return;
 
-	int rc = mdbx_txn_begin( db->env, NULL, rwflag, &db->txn );
+	struct txn_open_args_s txn_open_args;
+	txn_open_args.db = db;
+	txn_open_args.rwflag = rwflag;
+
+	void *result_ptr = rb_thread_call_without_gvl(
+		rmdbx_open_txn_without_gvl, (void *)&txn_open_args,
+		NULL, NULL
+	);
+
+	int rc = (int)result_ptr;
+
 	if ( rc != MDBX_SUCCESS ) {
 		rmdbx_close_all( db );
 		rb_raise( rmdbx_eDatabaseError, "mdbx_txn_begin: (%d) %s", rc, mdbx_strerror(rc) );
