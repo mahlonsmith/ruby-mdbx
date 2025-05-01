@@ -1,6 +1,14 @@
 # Release History for MDBX
 
 ---
+## v0.4.0 [2025-04-30] Mahlon E. Smith <mahlon@martini.nu>
+
+Enhancements:
+
+- Opening a long running transaction is now thread safe.
+
+
+---
 ## v0.3.8 [2025-02-20] Mahlon E. Smith <mahlon@martini.nu>
 
 Build fixes:

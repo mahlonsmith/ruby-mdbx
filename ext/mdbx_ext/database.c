@@ -465,27 +465,21 @@ rmdbx_in_transaction_p( VALUE self )
 }
 
 
+/* Inline struct for transaction arguments, passed as a void pointer. */
 struct txn_open_args_s {
 	rmdbx_db_t *db;
 	int rwflag;
 };
 
 
-/* Opens a transaction outside of th GVL. */
+/* Opens a transaction outside of the GVL. */
 void *
 rmdbx_open_txn_without_gvl( void *ptr )
 {
-	// struct query_call *qcall = (struct query_call *)ptr;
 	struct txn_open_args_s *txn_open_args = (struct txn_open_args_s *)ptr;
 
 	rmdbx_db_t *db = txn_open_args->db;
-
-	int rc = mdbx_txn_begin(
-		db->env,
-		NULL,
-		txn_open_args->rwflag,
-		&db->txn
-	);
+	int rc = mdbx_txn_begin( db->env, NULL, txn_open_args->rwflag, &db->txn );
 
 	return (void *)rc;
 }
@@ -508,7 +502,7 @@ rmdbx_open_txn( rmdbx_db_t *db, int rwflag )
 
 	void *result_ptr = rb_thread_call_without_gvl(
 		rmdbx_open_txn_without_gvl, (void *)&txn_open_args,
-		NULL, NULL
+		RUBY_UBF_IO, NULL
 	);
 
 	int rc = (int)result_ptr;
