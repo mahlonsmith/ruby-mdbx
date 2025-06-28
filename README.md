@@ -2,7 +2,7 @@
 # Ruby::MDBX
 
 home
-: https://code.martini.nu/fossil/ruby-mdbx
+: https://code.martini.nu/mahlon/ruby-mdbx
 
 docs
 : https://martini.nu/docs/ruby-mdbx
@@ -407,9 +407,9 @@ protector-strong",
 
 ## Contributing
 
-You can check out the current development source with Fossil via its
-[home repo](https://code.martini.nu/fossil/ruby-mdbx), or with Git at its
-[project mirror](https://github.com/mahlonsmith/ruby-mdbx)
+You can check out the current development source with Git/Jujutsu via its
+[home repo](https://code.martini.nu/mahlon/ruby-mdbx), or at its
+[project mirror](https://github.com/mahlonsmith/ruby-mdbx).
 
 After checking out the source, run:
 
@@ -430,7 +430,7 @@ Things may work for you in other environments - I'm just not matrix testing
 every possible permutation.
 
 Bugs reported against tested environments take precedence over others.  Please
-report any issues [here](https://code.martini.nu/fossil/ruby-mdbx/tktnew).
+report any issues [here](https://code.martini.nu/mahlon/ruby-mdbx/issues).
 
 
 ## Authors
